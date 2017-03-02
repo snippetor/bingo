@@ -20,8 +20,69 @@ type Config struct {
 	LogFileScanInterval time.Duration // 秒
 }
 
-func SetConfigFile(inifile string) {
-	ini, err := goconfig.LoadConfigFile(inifile)
+type Level int
+type OutputType int
+type SizeUnit int64
+
+const (
+	Info    Level = iota
+	Debug
+	Warning
+	Error
+)
+
+const (
+	Console          OutputType = iota
+	FileRollingDaily
+	FileRollingSize
+)
+
+const (
+	_  = iota
+	KB = 1 << (10 * iota)
+	MB
+	GB
+	TB
+)
+
+const DATE_FORMAT = "2006-01-02"
+
+type Logger struct {
+	config *Config
+	// 内置logger
+	lg *log.Logger
+	// 日志队列
+	c chan string
+	// 当前日志文件
+	f *os.File
+	// 检查文件monitor是否在运行
+	isMonitorRunning bool
+}
+
+func NewLogger(configFile string) *Logger {
+	// 默认配置
+	l := &Logger{}
+	l.c = make(chan string, 5000)
+	l.SetConfigFile(configFile)
+	// log write
+	go func() {
+		for {
+			s := <-l.c
+			if l.config.OutType == Console {
+				fmt.Println(s)
+			} else {
+				if l.f == nil || l.lg == nil {
+					l.makeFile()
+				}
+				l.lg.Output(2, s)
+			}
+		}
+	}()
+	return l
+}
+
+func (l *Logger) SetConfigFile(configFile string) {
+	ini, err := goconfig.LoadConfigFile(configFile)
 	if err != nil {
 		log.Println("=========== parse config file failed!!! ==========", err)
 		return
@@ -52,210 +113,162 @@ func SetConfigFile(inifile string) {
 		}
 	}
 	c.LogFileScanInterval = time.Duration(ini.MustInt("", "logFileScanInterval", 1)) * time.Second
-	SetConfig(c)
+	l.SetConfig(c)
 }
 
-func SetConfig(c *Config) {
-	if config != nil && config.OutType == Console && c.OutType != Console {
-		config = c
-		makeFile()
-		startFileCheckMonitor()
+func (l *Logger) SetConfig(c *Config) {
+	if l.config != nil && l.config.OutType == Console && c.OutType != Console {
+		l.config = c
+		l.makeFile()
+		l.startFileCheckMonitor()
 	} else {
-		config = c
+		l.config = c
 	}
 }
 
-func I(format string, v ...interface{}) {
-	if Info >= config.Level {
+func (l *Logger) I(format string, v ...interface{}) {
+	if Info >= l.config.Level {
 		if len(v) == 0 {
-			c <- "[I] " + format
+			l.c <- "[I] " + format
 		} else {
-			c <- "[I] " + fmt.Sprintf(format, v...)
+			l.c <- "[I] " + fmt.Sprintf(format, v...)
 		}
 	}
 }
 
-func D(format string, v ...interface{}) {
-	if Debug >= config.Level {
+func (l *Logger) D(format string, v ...interface{}) {
+	if Debug >= l.config.Level {
 		if len(v) == 0 {
-			c <- "[D] " + format
+			l.c <- "[D] " + format
 		} else {
-			c <- "[D] " + fmt.Sprintf(format, v...)
+			l.c <- "[D] " + fmt.Sprintf(format, v...)
 		}
 	}
 }
 
-func W(format string, v ...interface{}) {
-	if Warning >= config.Level {
+func (l *Logger) W(format string, v ...interface{}) {
+	if Warning >= l.config.Level {
 		if len(v) == 0 {
-			c <- "[W] " + format
+			l.c <- "[W] " + format
 		} else {
-			c <- "[W] " + fmt.Sprintf(format, v...)
+			l.c <- "[W] " + fmt.Sprintf(format, v...)
 		}
 	}
 }
 
-func E(format string, v ...interface{}) {
-	if Error >= config.Level {
+func (l *Logger) E(format string, v ...interface{}) {
+	if Error >= l.config.Level {
 		if len(v) == 0 {
-			c <- "[E] " + format
+			l.c <- "[E] " + format
 		} else {
-			c <- "[E] " + fmt.Sprintf(format, v...)
+			l.c <- "[E] " + fmt.Sprintf(format, v...)
 		}
 	}
 }
 
-type Level int
-type OutputType int
-type SizeUnit int64
-
-const (
-	Info    Level = iota
-	Debug
-	Warning
-	Error
-)
-
-const (
-	Console          OutputType = iota
-	FileRollingDaily
-	FileRollingSize
-)
-
-const (
-	_  = iota
-	KB = 1 << (10 * iota)
-	MB
-	GB
-	TB
-)
-
-const DATE_FORMAT = "2006-01-02"
-
-// 输出类型
-var (
-	config *Config
-	// 内置logger
-	lg *log.Logger
-	// 日志队列
-	c chan string = make(chan string, 5000)
-	// 当前日志文件
-	f *os.File
-	// 检查文件monitor是否在运行
-	isMonitorRunning bool = false
-)
-
-func init() {
-	// 默认配置
-	d, _ := os.Getwd()
-	config = &Config{
-		Level:              Info,
-		OutType:            Console,
-		OutDir:             d,
-		LogFileName:        "bingo",
-		LogFileMaxSize:     500 * MB,
-		LogFileScanInterval:1,
-	}
-	// log write
-	go func() {
-		for {
-			s := <-c
-			if config.OutType == Console {
-				fmt.Println(s)
-			} else {
-				if f == nil || lg == nil {
-					makeFile()
-				}
-				lg.Output(2, s)
-			}
-		}
-	}()
-}
-
-func startFileCheckMonitor() {
-	if isMonitorRunning {
+func (l *Logger) startFileCheckMonitor() {
+	if l.isMonitorRunning {
 		return
 	}
-	isMonitorRunning = true
+	l.isMonitorRunning = true
 	// file check monitor
 	go func() {
-		monitorTimer := time.NewTicker(config.LogFileScanInterval)
+		monitorTimer := time.NewTicker(l.config.LogFileScanInterval)
 		for {
 			select {
 			case <-monitorTimer.C:
-				checkFile()
+				l.checkFile()
 			}
 		}
 	}()
 }
 
-func makeFile() {
-	if config.OutType == Console {
+func (l *Logger) makeFile() {
+	if l.config.OutType == Console {
 		return
 	}
-	if f == nil {
+	if l.f == nil {
 		var err error = nil
-		if config.OutType == FileRollingDaily {
+		if l.config.OutType == FileRollingDaily {
 			t := time.Now().Format(DATE_FORMAT)
-			f, err = os.OpenFile(filepath.Join(config.OutDir, config.LogFileName+"_"+t), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
-		} else if config.OutType == FileRollingSize {
-			f, err = os.OpenFile(filepath.Join(config.OutDir, config.LogFileName+"_1"), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+			l.f, err = os.OpenFile(filepath.Join(l.config.OutDir, l.config.LogFileName+"_"+t), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+		} else if l.config.OutType == FileRollingSize {
+			l.f, err = os.OpenFile(filepath.Join(l.config.OutDir, l.config.LogFileName+"_1"), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 		}
 		if err != nil {
 			log.Println("=========== create log file failed!!! ========", err)
 			return
 		}
 	}
-	if f == nil {
+	if l.f == nil {
 		log.Println("=========== check log file failed, not found log file!!! ========")
 		return
 	}
-	if lg == nil {
-		lg = log.New(f, "", log.Ldate|log.Lmicroseconds)
+	if l.lg == nil {
+		if l.config.OutType == FileRollingDaily {
+			l.lg = log.New(l.f, "", log.Lmicroseconds)
+		} else if l.config.OutType == FileRollingSize {
+			l.lg = log.New(l.f, "", log.Ldate|log.Lmicroseconds)
+		}
 	} else {
-		lg.SetOutput(f)
+		l.lg.SetOutput(l.f)
+		if l.config.OutType == FileRollingDaily {
+			l.lg.SetFlags(log.Lmicroseconds)
+		} else if l.config.OutType == FileRollingSize {
+			l.lg.SetFlags(log.Ldate | log.Lmicroseconds)
+		}
 	}
 }
 
-func checkFile() {
-	if config.OutType == Console {
+func (l *Logger) checkFile() {
+	if l.config.OutType == Console {
 		return
 	}
-	if config.OutType == FileRollingDaily {
+	if l.config.OutType == FileRollingDaily {
 		dateString := time.Now().Format(DATE_FORMAT)
 		t, _ := time.Parse(DATE_FORMAT, dateString)
-		d, _ := time.Parse(DATE_FORMAT, strings.Replace(f.Name(), config.LogFileName+"_", "", 1))
+		d, _ := time.Parse(DATE_FORMAT, strings.Replace(l.f.Name(), l.config.LogFileName+"_", "", 1))
 		if t.After(d) {
-			f.Close()
+			l.f.Close()
 			var err error
-			f, err = os.OpenFile(filepath.Join(config.OutDir, config.LogFileName+"_"+dateString), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+			l.f, err = os.OpenFile(filepath.Join(l.config.OutDir, l.config.LogFileName+"_"+dateString), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 			if err != nil {
 				log.Println("=========== create log file failed!!! ========", err)
 				return
 			}
-			lg.SetOutput(f)
+			l.lg.SetOutput(l.f)
+			if l.config.OutType == FileRollingDaily {
+				l.lg.SetFlags(log.Lmicroseconds)
+			} else if l.config.OutType == FileRollingSize {
+				l.lg.SetFlags(log.Ldate | log.Lmicroseconds)
+			}
 		}
 	} else {
-		f.Name()
-		info, err := os.Stat(filepath.Join(config.OutDir, f.Name()))
+		l.f.Name()
+		info, err := os.Stat(filepath.Join(l.config.OutDir, l.f.Name()))
 		if err != nil {
 			log.Println("============= check file size failed!!! ==========", err)
 			return
 		}
-		if info.Size() >= config.LogFileMaxSize {
-			seq, e := strconv.Atoi(strings.Replace(f.Name(), config.LogFileName+"_", "", 1))
+		if info.Size() >= l.config.LogFileMaxSize {
+			seq, e := strconv.Atoi(strings.Replace(l.f.Name(), l.config.LogFileName+"_", "", 1))
 			if e != nil {
 				log.Println("============= check file sequence number failed!!! ==========", err)
 				return
 			}
-			f.Close()
+			l.f.Close()
 			var err error
-			f, err = os.OpenFile(filepath.Join(config.OutDir, config.LogFileName+"_"+strconv.Itoa(seq + 1)), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+			l.f, err = os.OpenFile(filepath.Join(l.config.OutDir, l.config.LogFileName+"_"+strconv.Itoa(seq + 1)), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 			if err != nil {
 				log.Println("=========== create log file failed!!! ========", err)
 				return
 			}
-			lg.SetOutput(f)
+			l.lg.SetOutput(l.f)
+			if l.config.OutType == FileRollingDaily {
+				l.lg.SetFlags(log.Lmicroseconds)
+			} else if l.config.OutType == FileRollingSize {
+				l.lg.SetFlags(log.Ldate | log.Lmicroseconds)
+			}
 		}
 	}
 }

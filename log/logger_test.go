@@ -42,7 +42,8 @@ func TestFile(t *testing.T) {
 }
 
 func BenchmarkFile(b *testing.B) {
-	SetConfig(&Config{
+	l := NewLogger()
+	l.SetConfig(&Config{
 		Level:              Info,
 		OutType:            FileRollingDaily,
 		OutDir:             "",
@@ -51,6 +52,6 @@ func BenchmarkFile(b *testing.B) {
 		LogFileScanInterval:1,
 	})
 	for i := 0; i < b.N; i++ {
-		I("test info....%s %s", "k", "x")
+		l.I("test info....%s %s", "k", "x")
 	}
 }

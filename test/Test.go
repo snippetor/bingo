@@ -13,29 +13,5 @@ func main() {
 	//l.Output(2, "[I] test")
 	//l.Output(2, "[D] test1")
 
-	c := make(chan string, 1000)
-	go func() {
-		for i := 0; i < 1000; i++ {
-			c <- "goroutine1"
-		}
-	}()
 
-	go func() {
-		for i := 0; i < 1000; i++ {
-			c <- "goroutine2"
-		}
-	}()
-
-	go func() {
-		for {
-			select {
-			case s := <- c:
-				fmt.Println(s)
-			}
-		}
-	}()
-
-	for {
-		if true {}
-	}
 }

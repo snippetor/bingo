@@ -9,12 +9,15 @@ import (
 	"path/filepath"
 	"strconv"
 	"github.com/Unknwon/goconfig"
+	"github.com/snippetor/bingo/utils"
+	"io/ioutil"
 )
 
 type Config struct {
 	Level               Level
-	OutType             OutputType
-	OutDir              string
+	OutputType          OutputType
+	LogFileRollingType  RollingType
+	LogFileOutputDir    string
 	LogFileName         string
 	LogFileMaxSize      int64         // 字节
 	LogFileScanInterval time.Duration // 秒
@@ -22,7 +25,7 @@ type Config struct {
 
 type Level int
 type OutputType int
-type SizeUnit int64
+type RollingType int
 
 const (
 	Info    Level = iota
@@ -32,9 +35,13 @@ const (
 )
 
 const (
-	Console          OutputType = iota
-	FileRollingDaily
-	FileRollingSize
+	Console OutputType = 1 << iota
+	File
+)
+
+const (
+	RollingDaily RollingType = 1 << iota
+	RollingSize
 )
 
 const (
@@ -45,7 +52,17 @@ const (
 	TB
 )
 
-const DATE_FORMAT = "2006-01-02"
+const DATE_FORMAT = "20060102"
+
+var DEFAULT_CONFIG = &Config{
+	Level:               Info,
+	OutputType:          Console,
+	LogFileOutputDir:    ".",
+	LogFileRollingType:  RollingDaily,
+	LogFileName:         "bingo",
+	LogFileMaxSize:      500 * MB,
+	LogFileScanInterval: 1 * time.Second,
+}
 
 type Logger struct {
 	config *Config
@@ -62,15 +79,21 @@ type Logger struct {
 func NewLogger(configFile string) *Logger {
 	// 默认配置
 	l := &Logger{}
+	l.setConfigFile(configFile)
+	l.init()
+	return l
+}
+
+func (l *Logger) init() {
 	l.c = make(chan string, 5000)
-	l.SetConfigFile(configFile)
 	// log write
 	go func() {
 		for {
 			s := <-l.c
-			if l.config.OutType == Console {
-				fmt.Println(s)
-			} else {
+			if l.config.OutputType&Console == Console {
+				fmt.Println(time.Now().Format("15:04:05") + " " + s)
+			}
+			if l.config.OutputType&File == File {
 				if l.f == nil || l.lg == nil {
 					l.makeFile()
 				}
@@ -78,29 +101,34 @@ func NewLogger(configFile string) *Logger {
 			}
 		}
 	}()
-	return l
 }
 
-func (l *Logger) SetConfigFile(configFile string) {
+func (l *Logger) setConfigFile(configFile string) {
 	ini, err := goconfig.LoadConfigFile(configFile)
 	if err != nil {
 		log.Println("=========== parse config file failed!!! ==========", err)
 		return
 	}
 	d, _ := os.Getwd()
+	mode := ini.MustValue("", "workMode", "prod")
+	if _, err := ini.GetSection(mode); err != nil {
+		log.Println("=========== no section ["+mode+"] found in config file!!! ==========", err)
+		return
+	}
 	c := &Config{}
-	c.Level = Level(ini.MustInt("", "level", int(Info)))
-	c.OutType = OutputType(ini.MustInt("", "outputType", int(Console)))
-	c.OutDir = strings.TrimSpace(ini.MustValue("", "outputDir", d))
-	c.LogFileName = strings.TrimSpace(ini.MustValue("", "logFileName", "bingo"))
-	size := strings.TrimSpace(ini.MustValue("", "logFileMaxSize", "500MB"))
+	c.Level = Level(ini.MustInt(mode, "level", int(Info)))
+	c.OutputType = OutputType(ini.MustInt(mode, "outputType", int(Console)))
+	c.LogFileOutputDir = strings.TrimSpace(ini.MustValue(mode, "logFileOutputDir", d))
+	c.LogFileRollingType = RollingType(ini.MustInt(mode, "logFileRollingType", int(RollingDaily)))
+	c.LogFileName = strings.TrimSpace(ini.MustValue(mode, "logFileName", "bingo"))
+	size := strings.TrimSpace(ini.MustValue(mode, "logFileMaxSize", "500MB"))
 	i, err := strconv.ParseInt(size, 10, 64)
 	if err == nil {
 		c.LogFileMaxSize = i
 	} else {
-		i, err = strconv.ParseInt(size[:len(size) - 2], 10, 64)
+		i, err = strconv.ParseInt(size[:len(size)-2], 10, 64)
 		if err == nil {
-			unit := strings.ToUpper(size[len(size) - 2:])
+			unit := strings.ToUpper(size[len(size)-2:])
 			if unit == "KB" {
 				c.LogFileMaxSize = i * KB
 			} else if unit == "MB" {
@@ -112,18 +140,14 @@ func (l *Logger) SetConfigFile(configFile string) {
 			}
 		}
 	}
-	c.LogFileScanInterval = time.Duration(ini.MustInt("", "logFileScanInterval", 1)) * time.Second
-	l.SetConfig(c)
+	c.LogFileScanInterval = time.Duration(ini.MustInt(mode, "logFileScanInterval", 1)) * time.Second
+	l.setConfig(c)
 }
 
-func (l *Logger) SetConfig(c *Config) {
-	if l.config != nil && l.config.OutType == Console && c.OutType != Console {
-		l.config = c
-		l.makeFile()
-		l.startFileCheckMonitor()
-	} else {
-		l.config = c
-	}
+func (l *Logger) setConfig(c *Config) {
+	l.config = c
+	l.makeFile()
+	l.startFileCheckMonitor()
 }
 
 func (l *Logger) I(format string, v ...interface{}) {
@@ -183,92 +207,127 @@ func (l *Logger) startFileCheckMonitor() {
 	}()
 }
 
+// 初始化日志文件
 func (l *Logger) makeFile() {
-	if l.config.OutType == Console {
+	if l.config.OutputType == Console {
 		return
 	}
 	if l.f == nil {
-		var err error = nil
-		if l.config.OutType == FileRollingDaily {
+		var err error
+		var fileName string = l.config.LogFileName
+		if l.config.LogFileRollingType&RollingDaily == RollingDaily {
 			t := time.Now().Format(DATE_FORMAT)
-			l.f, err = os.OpenFile(filepath.Join(l.config.OutDir, l.config.LogFileName+"_"+t), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
-		} else if l.config.OutType == FileRollingSize {
-			l.f, err = os.OpenFile(filepath.Join(l.config.OutDir, l.config.LogFileName+"_1"), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+			fileName += "-" + t
 		}
+		if l.config.LogFileRollingType&RollingSize == RollingSize {
+			fileName += "-" + l.genFileSeq()
+		}
+		l.f, err = os.OpenFile(filepath.Join(l.config.LogFileOutputDir, fileName), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 		if err != nil {
 			log.Println("=========== create log file failed!!! ========", err)
 			return
 		}
 	}
-	if l.f == nil {
-		log.Println("=========== check log file failed, not found log file!!! ========")
-		return
-	}
 	if l.lg == nil {
-		if l.config.OutType == FileRollingDaily {
+		if l.config.LogFileRollingType&RollingDaily == RollingDaily {
 			l.lg = log.New(l.f, "", log.Lmicroseconds)
-		} else if l.config.OutType == FileRollingSize {
+		} else {
 			l.lg = log.New(l.f, "", log.Ldate|log.Lmicroseconds)
 		}
 	} else {
-		l.lg.SetOutput(l.f)
-		if l.config.OutType == FileRollingDaily {
+		if l.config.LogFileRollingType&RollingDaily == RollingDaily {
 			l.lg.SetFlags(log.Lmicroseconds)
-		} else if l.config.OutType == FileRollingSize {
+		} else {
 			l.lg.SetFlags(log.Ldate | log.Lmicroseconds)
 		}
+		l.lg.SetOutput(l.f)
 	}
 }
 
+// 检查文件是否需要重新创建
 func (l *Logger) checkFile() {
-	if l.config.OutType == Console {
+	if l.config.OutputType == Console {
 		return
 	}
-	if l.config.OutType == FileRollingDaily {
+	needRecreate, newFileName := false, l.config.LogFileName
+	if l.config.LogFileRollingType&RollingDaily == RollingDaily {
 		dateString := time.Now().Format(DATE_FORMAT)
 		t, _ := time.Parse(DATE_FORMAT, dateString)
-		d, _ := time.Parse(DATE_FORMAT, strings.Replace(l.f.Name(), l.config.LogFileName+"_", "", 1))
-		if t.After(d) {
-			l.f.Close()
-			var err error
-			l.f, err = os.OpenFile(filepath.Join(l.config.OutDir, l.config.LogFileName+"_"+dateString), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+		if len(l.f.Name()) >= len(l.config.LogFileName)+9 {
+			d, err := time.Parse(DATE_FORMAT, l.f.Name()[len(l.config.LogFileName)+1:len(l.config.LogFileName)+9])
 			if err != nil {
-				log.Println("=========== create log file failed!!! ========", err)
-				return
+				log.Println("============== parse date failed!!! ===============")
 			}
-			l.lg.SetOutput(l.f)
-			if l.config.OutType == FileRollingDaily {
-				l.lg.SetFlags(log.Lmicroseconds)
-			} else if l.config.OutType == FileRollingSize {
-				l.lg.SetFlags(log.Ldate | log.Lmicroseconds)
+			if t.After(d) {
+				needRecreate = true
+				newFileName += "-" + dateString
+				newFileName += "-1"
+				l.resetFileSeq()
 			}
+		} else {
+			needRecreate = true
+			newFileName += "-" + dateString
+			newFileName += "-1"
+			l.resetFileSeq()
 		}
-	} else {
-		l.f.Name()
-		info, err := os.Stat(filepath.Join(l.config.OutDir, l.f.Name()))
+	}
+
+	if l.config.LogFileRollingType&RollingSize == RollingSize && !needRecreate {
+		info, err := os.Stat(filepath.Join(l.config.LogFileOutputDir, l.f.Name()))
 		if err != nil {
 			log.Println("============= check file size failed!!! ==========", err)
 			return
 		}
 		if info.Size() >= l.config.LogFileMaxSize {
-			seq, e := strconv.Atoi(strings.Replace(l.f.Name(), l.config.LogFileName+"_", "", 1))
-			if e != nil {
-				log.Println("============= check file sequence number failed!!! ==========", err)
-				return
-			}
-			l.f.Close()
-			var err error
-			l.f, err = os.OpenFile(filepath.Join(l.config.OutDir, l.config.LogFileName+"_"+strconv.Itoa(seq + 1)), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
-			if err != nil {
-				log.Println("=========== create log file failed!!! ========", err)
-				return
-			}
-			l.lg.SetOutput(l.f)
-			if l.config.OutType == FileRollingDaily {
-				l.lg.SetFlags(log.Lmicroseconds)
-			} else if l.config.OutType == FileRollingSize {
-				l.lg.SetFlags(log.Ldate | log.Lmicroseconds)
+			if needRecreate {
+				newFileName += "-" + l.genFileSeq()
+			} else {
+				needRecreate = true
+				dateString := time.Now().Format(DATE_FORMAT)
+				newFileName += "-" + dateString
+				newFileName += "-" + l.genFileSeq()
 			}
 		}
+	}
+
+	if needRecreate {
+		l.f.Close()
+		var err error
+		l.f, err = os.OpenFile(filepath.Join(l.config.LogFileOutputDir, newFileName), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+		if err != nil {
+			log.Println("=========== create log file failed!!! ========", err)
+			return
+		}
+		l.lg.SetOutput(l.f)
+		if l.config.LogFileRollingType&RollingDaily == RollingDaily {
+			l.lg.SetFlags(log.Lmicroseconds)
+		} else {
+			l.lg.SetFlags(log.Ldate | log.Lmicroseconds)
+		}
+	}
+}
+
+// 生成日志文件序列号，并保存到.seq
+func (l *Logger) genFileSeq() string {
+	seqFile := filepath.Join(l.config.LogFileOutputDir, ".seq")
+	if utils.IsFileExists(seqFile) {
+		bytes, err := ioutil.ReadFile(seqFile)
+		if err == nil {
+			seq, err := strconv.Atoi(string(bytes))
+			if err == nil {
+				ioutil.WriteFile(seqFile, []byte(strconv.Itoa(seq+1)), 0666)
+				return strconv.Itoa(seq + 1)
+			}
+		}
+	}
+	ioutil.WriteFile(seqFile, []byte("1"), 0666)
+	return "1"
+}
+
+// 重置日志文件序列号
+func (l *Logger) resetFileSeq() {
+	seqFile := filepath.Join(l.config.LogFileOutputDir, ".seq")
+	if utils.IsFileExists(seqFile) {
+		ioutil.WriteFile(seqFile, []byte("1"), 0666)
 	}
 }

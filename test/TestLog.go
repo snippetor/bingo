@@ -10,7 +10,7 @@ import (
 
 func main() {
 	wd, _:= os.Getwd()
-	log.SetConfigFile(filepath.Join(wd, "test/log.config"))
+	log.SetDefaultLogConfigFile(filepath.Join(wd, "log/config.ini"))
 
 	go func() {
 		t := time.NewTicker(3*time.Second)

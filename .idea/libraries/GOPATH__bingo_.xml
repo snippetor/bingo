@@ -1,12 +1,34 @@
 <component name="libraryTable">
   <library name="GOPATH &lt;bingo&gt;">
     <CLASSES>
-      <root url="file://$PROJECT_DIR$/../.." />
+      <root url="file://$PROJECT_DIR$/../../../99crm" />
+      <root url="file://$PROJECT_DIR$/../../../echo-server" />
+      <root url="file://$PROJECT_DIR$/../../../zgxq_server_v1" />
+      <root url="file://$PROJECT_DIR$/../../../GifGallery" />
+      <root url="file://$PROJECT_DIR$/../../../chess" />
       <root url="file://$PROJECT_DIR$/../../../poker_server" />
+      <root url="file://$PROJECT_DIR$/../.." />
+      <root url="file://$PROJECT_DIR$/../../../golang.org" />
+      <root url="file://$PROJECT_DIR$/../../../SimpleHTTPServer" />
+      <root url="file://$PROJECT_DIR$/../../../gopkg.in" />
+      <root url="file://$PROJECT_DIR$/../../../Test" />
+      <root url="file://$PROJECT_DIR$/../../../Spider" />
+      <root url="file://$PROJECT_DIR$/../../../sourcegraph.com" />
     </CLASSES>
     <SOURCES>
-      <root url="file://$PROJECT_DIR$/../.." />
+      <root url="file://$PROJECT_DIR$/../../../99crm" />
+      <root url="file://$PROJECT_DIR$/../../../echo-server" />
+      <root url="file://$PROJECT_DIR$/../../../zgxq_server_v1" />
+      <root url="file://$PROJECT_DIR$/../../../GifGallery" />
+      <root url="file://$PROJECT_DIR$/../../../chess" />
       <root url="file://$PROJECT_DIR$/../../../poker_server" />
+      <root url="file://$PROJECT_DIR$/../.." />
+      <root url="file://$PROJECT_DIR$/../../../golang.org" />
+      <root url="file://$PROJECT_DIR$/../../../SimpleHTTPServer" />
+      <root url="file://$PROJECT_DIR$/../../../gopkg.in" />
+      <root url="file://$PROJECT_DIR$/../../../Test" />
+      <root url="file://$PROJECT_DIR$/../../../Spider" />
+      <root url="file://$PROJECT_DIR$/../../../sourcegraph.com" />
     </SOURCES>
     <excluded>
       <root url="file://$PROJECT_DIR$" />

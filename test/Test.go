@@ -2,7 +2,19 @@ package main
 
 import (
 	"fmt"
+	"reflect"
 )
+
+type A interface {
+	func1()
+}
+
+type B struct {
+}
+
+func (b *B) func1() {
+	fmt.Println("b")
+}
 
 func main() {
 	//dir, _ := os.Getwd()
@@ -12,6 +24,8 @@ func main() {
 	//l := log.New(f, "", log.Lmicroseconds)
 	//l.Output(2, "[I] test")
 	//l.Output(2, "[D] test1")
-
-
+	var a A
+	a = A(&B{})
+	fmt.Println(reflect.TypeOf(a))
+	(a).func1()
 }

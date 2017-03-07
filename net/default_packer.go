@@ -8,11 +8,13 @@ import (
 )
 
 // 消息包
-type MessagePacker struct {
+type defaultMessagePacker struct {
 }
 
-func (p *MessagePacker) Pack(messageId int32, content []byte) []byte {
-	if content != nil && len(content) > math.MaxInt32{
+func (p *defaultMessagePacker) pack(messageId MessageId, content MessageBody) []byte {
+	if content != nil && len(content) > math.MaxInt32 {
+		bingo.E("-- MessagePacker - body length is too large! %d --", len(content))
+		return nil
 	}
 	pk := make([]byte, 0)
 	// 写入长度
@@ -34,7 +36,7 @@ func (p *MessagePacker) Pack(messageId int32, content []byte) []byte {
 	return pk
 }
 
-func (p *MessagePacker) Unpack(buffer []byte) (int32, []byte, []byte) {
+func (p *defaultMessagePacker) unpack(buffer []byte) (MessageId, MessageBody, []byte) {
 	if buffer == nil || len(buffer) == 0 {
 		return -1, nil, buffer
 	}
@@ -46,15 +48,15 @@ func (p *MessagePacker) Unpack(buffer []byte) (int32, []byte, []byte) {
 		return -1, nil, buffer
 	}
 	if len(buffer)-4 >= int(length) {
-		var id int32
+		var id MessageId
 		// 再4个字节为消息ID
 		buf.Reset()
 		buf.Write(buffer[4:8])
 		binary.Read(buf, binary.BigEndian, &id)
 		// 剩余为包体
-		ret := buffer[8:4+length]
-		if int(4+length) < len(buffer) {
-			buffer = buffer[4+length:]
+		ret := buffer[8:4 + length]
+		if int(4 + length) < len(buffer) {
+			buffer = buffer[4 + length:]
 		} else {
 			buffer = make([]byte, 0)
 		}

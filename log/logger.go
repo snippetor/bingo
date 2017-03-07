@@ -18,10 +18,9 @@ type Config struct {
 	OutputType             OutputType
 	LogFileRollingType     RollingType
 	LogFileOutputDir       string
-	LogFileContentPattern  string // "DT [L] M"
 	LogFileName            string
 	LogFileNameDatePattern string
-	LogFileExt             string
+	LogFileNameExt         string
 	LogFileMaxSize         int64         // 字节
 	LogFileScanInterval    time.Duration // 秒
 }
@@ -56,16 +55,15 @@ const (
 )
 
 var DEFAULT_CONFIG = &Config{
-	Level:                  Info,
-	OutputType:             Console | File,
-	LogFileRollingType:     RollingDaily,
-	LogFileOutputDir:       ".",
-	LogFileContentPattern:  "T [L] M",
-	LogFileName:            "default",
-	LogFileNameDatePattern: "20060102",
-	LogFileExt:             ".log",
-	LogFileMaxSize:         500 * MB,
-	LogFileScanInterval:    1 * time.Second,
+	Level:                      Info,
+	OutputType:                 Console | File,
+	LogFileRollingType:         RollingDaily,
+	LogFileOutputDir:           ".",
+	LogFileName:                "bingo",
+	LogFileNameDatePattern:     "20060102",
+	LogFileNameExt:             ".log",
+	LogFileMaxSize:             500 * MB,
+	LogFileScanInterval:        1 * time.Second,
 }
 
 type Logger struct {
@@ -84,6 +82,14 @@ func NewLogger(configFile string) *Logger {
 	// 默认配置
 	l := &Logger{}
 	l.setConfigFile(configFile)
+	l.init()
+	return l
+}
+
+func NewLoggerWithConfig(config *Config) *Logger {
+	// 默认配置
+	l := &Logger{}
+	l.setConfig(config)
 	l.init()
 	return l
 }
@@ -113,26 +119,27 @@ func (l *Logger) setConfigFile(configFile string) {
 		log.Println("=========== parse config file failed!!! ==========", err)
 		return
 	}
-	d, _ := os.Getwd()
 	mode := ini.MustValue("", "workMode", "prod")
 	if _, err := ini.GetSection(mode); err != nil {
 		log.Println("=========== no section ["+mode+"] found in config file!!! ==========", err)
 		return
 	}
 	c := &Config{}
-	c.Level = Level(ini.MustInt(mode, "level", int(Info)))
-	c.OutputType = OutputType(ini.MustInt(mode, "outputType", int(Console)))
-	c.LogFileOutputDir = strings.TrimSpace(ini.MustValue(mode, "logFileOutputDir", d))
-	c.LogFileRollingType = RollingType(ini.MustInt(mode, "logFileRollingType", int(RollingDaily)))
-	c.LogFileName = strings.TrimSpace(ini.MustValue(mode, "logFileName", "bingo"))
+	c.Level = Level(ini.MustInt(mode, "level", int(DEFAULT_CONFIG.Level)))
+	c.OutputType = OutputType(ini.MustInt(mode, "outputType", int(DEFAULT_CONFIG.OutputType)))
+	c.LogFileOutputDir = strings.TrimSpace(ini.MustValue(mode, "logFileOutputDir", DEFAULT_CONFIG.LogFileOutputDir))
+	c.LogFileRollingType = RollingType(ini.MustInt(mode, "logFileRollingType", int(DEFAULT_CONFIG.LogFileRollingType)))
+	c.LogFileName = strings.TrimSpace(ini.MustValue(mode, "logFileName", DEFAULT_CONFIG.LogFileName))
+	c.LogFileNameDatePattern = strings.TrimSpace(ini.MustValue(mode, "logFileNameDatePattern", DEFAULT_CONFIG.LogFileNameDatePattern))
+	c.LogFileNameExt = strings.TrimSpace(ini.MustValue(mode, "logFileNameExt", DEFAULT_CONFIG.LogFileNameExt))
 	size := strings.TrimSpace(ini.MustValue(mode, "logFileMaxSize", "500MB"))
 	i, err := strconv.ParseInt(size, 10, 64)
 	if err == nil {
 		c.LogFileMaxSize = i
 	} else {
-		i, err = strconv.ParseInt(size[:len(size)-2], 10, 64)
+		i, err = strconv.ParseInt(size[:len(size) - 2], 10, 64)
 		if err == nil {
-			unit := strings.ToUpper(size[len(size)-2:])
+			unit := strings.ToUpper(size[len(size) - 2:])
 			if unit == "KB" {
 				c.LogFileMaxSize = i * KB
 			} else if unit == "MB" {
@@ -226,7 +233,7 @@ func (l *Logger) makeFile() {
 		if l.config.LogFileRollingType&RollingSize == RollingSize {
 			fileName += "-" + l.genFileSeq()
 		}
-		l.f, err = os.OpenFile(filepath.Join(l.config.LogFileOutputDir, fileName), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+		l.f, err = os.OpenFile(filepath.Join(l.config.LogFileOutputDir, fileName+l.config.LogFileNameExt), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 		if err != nil {
 			log.Println("=========== create log file failed!!! ========", err)
 			return
@@ -257,8 +264,8 @@ func (l *Logger) checkFile() {
 	if l.config.LogFileRollingType&RollingDaily == RollingDaily {
 		dateString := time.Now().Format(l.config.LogFileNameDatePattern)
 		t, _ := time.Parse(l.config.LogFileNameDatePattern, dateString)
-		if len(l.f.Name()) >= len(l.config.LogFileName)+9 {
-			d, err := time.Parse(l.config.LogFileNameDatePattern, l.f.Name()[len(l.config.LogFileName)+1:len(l.config.LogFileName)+9])
+		if len(l.f.Name()) >= len(l.config.LogFileName)+len(l.config.LogFileNameExt)+len(l.config.LogFileNameDatePattern)+1 {
+			d, err := time.Parse(l.config.LogFileNameDatePattern, l.f.Name()[len(l.config.LogFileName) + 1:len(l.config.LogFileName) + len(l.config.LogFileNameDatePattern) + 1])
 			if err != nil {
 				log.Println("============== parse date failed!!! ===============")
 			}
@@ -297,7 +304,7 @@ func (l *Logger) checkFile() {
 	if needRecreate {
 		l.f.Close()
 		var err error
-		l.f, err = os.OpenFile(filepath.Join(l.config.LogFileOutputDir, newFileName), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+		l.f, err = os.OpenFile(filepath.Join(l.config.LogFileOutputDir, newFileName+l.config.LogFileNameExt), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 		if err != nil {
 			log.Println("=========== create log file failed!!! ========", err)
 			return
@@ -319,7 +326,7 @@ func (l *Logger) genFileSeq() string {
 		if err == nil {
 			seq, err := strconv.Atoi(string(bytes))
 			if err == nil {
-				ioutil.WriteFile(seqFile, []byte(strconv.Itoa(seq+1)), 0666)
+				ioutil.WriteFile(seqFile, []byte(strconv.Itoa(seq + 1)), 0666)
 				return strconv.Itoa(seq + 1)
 			}
 		}

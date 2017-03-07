@@ -10,7 +10,7 @@ import (
 
 func main() {
 	wd, _:= os.Getwd()
-	log.SetDefaultLogConfigFile(filepath.Join(wd, "log/example.ini"))
+	logger := log.NewLogger(filepath.Join(wd, "log/example.ini"))
 
 	go func() {
 		t := time.NewTicker(3*time.Second)
@@ -18,10 +18,10 @@ func main() {
 			select {
 			case <-t.C:
 				fmt.Println("ticker1..")
-				log.I("test1 info========")
-				log.D("test1 debug========")
-				log.W("test1 warning========")
-				log.E("test1 err========")
+				logger.I("test1 info========")
+				logger.D("test1 debug========")
+				logger.W("test1 warning========")
+				logger.E("test1 err========")
 			}
 		}
 	}()
@@ -32,10 +32,10 @@ func main() {
 			select {
 			case <-t.C:
 				fmt.Println("ticker2..")
-				log.I("test2 info========")
-				log.D("test2 debug========")
-				log.W("test2 warning========")
-				log.E("test2 err========")
+				logger.I("test2 info========")
+				logger.D("test2 debug========")
+				logger.W("test2 warning========")
+				logger.E("test2 err========")
 			}
 		}
 	}()

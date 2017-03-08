@@ -4,7 +4,7 @@ type MessageId int32
 type MessageBody []byte
 
 const (
-	MSGID_CONNECT_DISCONNECT = -1
+	MSGID_CONNECT_DISCONNECT = -1024
 )
 
 type iMessagePacker interface {
@@ -16,15 +16,15 @@ type iMessagePacker interface {
 
 type IConn interface {
 	Send(msgId MessageId, body MessageBody) bool
-	read([]byte) (int, error)
+	read(*[]byte) (int, error)
 	Close()
 	Address() string
 }
 
-type iMessageCallback func(conn IConn, msgId MessageId, body MessageBody)
+type IMessageCallback func(conn IConn, msgId MessageId, body MessageBody)
 
 type iServer interface {
-	listen(int, iMessageCallback)
+	listen(int, IMessageCallback) bool
 	close()
 }
 
@@ -42,4 +42,10 @@ func (s *absServer) setConfig(key, value string) {
 func (s *absServer) getConfig(key string) (string, bool) {
 	v, ok := s.config[key]
 	return v, ok
+}
+
+// 数据传输协议，即包体格式
+type iProtocol interface {
+	marshaler(v interface{}) []byte
+	unmarshaler([]byte, v interface{})
 }

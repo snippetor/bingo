@@ -10,9 +10,9 @@ type tcpConn struct {
 	conn *net.TCPConn
 }
 
-func (c *tcpConn) Send(msg []byte) bool {
-	if c.conn != nil && msg != nil && len(msg) > 0 {
-		c.conn.Write(msg)
+func (c *tcpConn) Send(msgId MessageId, body MessageBody) bool {
+	if c.conn != nil && body != nil && len(body) > 0 {
+		c.conn.Write(getMessagePacker().pack(msgId, body))
 		return true
 	} else {
 		bingo.E("-- send message failed!!! --")
@@ -20,9 +20,9 @@ func (c *tcpConn) Send(msg []byte) bool {
 	}
 }
 
-func (c *tcpConn) read(buf []byte) (int, error) {
+func (c *tcpConn) read(buf *[]byte) (int, error) {
 	if c.conn != nil {
-		return c.conn.Read(buf)
+		return c.conn.Read(*buf)
 	}
 	return -1, nil
 }
@@ -42,10 +42,11 @@ func (c *tcpConn) Address() string {
 }
 
 type tcpServer struct {
+	absServer
 	listener *net.TCPListener
 }
 
-func (s *tcpServer) listen(port int, callback iMessageCallback) bool {
+func (s *tcpServer) listen(port int, callback IMessageCallback) bool {
 	addr, err := net.ResolveTCPAddr("tcp", ":"+strconv.Itoa(port))
 	if err != nil {
 		bingo.E(err.Error())
@@ -58,7 +59,7 @@ func (s *tcpServer) listen(port int, callback iMessageCallback) bool {
 	}
 	defer listener.Close()
 	s.listener = listener
-	bingo.I("Tcp server runnning on :%d", strconv.Itoa(port))
+	bingo.I("Tcp server runnning on :%d", port)
 	for {
 		conn, err := listener.AcceptTCP()
 		if err != nil {
@@ -70,19 +71,19 @@ func (s *tcpServer) listen(port int, callback iMessageCallback) bool {
 	return true
 }
 
-func (s *tcpServer) handleConnection(conn IConn, callback iMessageCallback) {
+func (s *tcpServer) handleConnection(conn IConn, callback IMessageCallback) {
 	buf := make([]byte, 4096) // 4KB
 	byteBuffer := make([]byte, 0)
+	defer conn.Close()
 	for {
-		l, err := conn.read(buf)
+		l, err := conn.read(&buf)
 		if err != nil {
 			bingo.E(err.Error())
-			conn.Close()
 			callback(conn, MSGID_CONNECT_DISCONNECT, nil)
 			break
 		}
 		byteBuffer = append(byteBuffer, buf[:l]...)
-		packer := GetMessagePacker()
+		packer := getMessagePacker()
 		for {
 			id, body, remains := packer.unpack(byteBuffer)
 			if body == nil || len(remains) == 0 {

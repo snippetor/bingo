@@ -14,13 +14,16 @@ import (
 )
 
 type Config struct {
-	Level               Level
-	OutputType          OutputType
-	LogFileRollingType  RollingType
-	LogFileOutputDir    string
-	LogFileName         string
-	LogFileMaxSize      int64         // 字节
-	LogFileScanInterval time.Duration // 秒
+	Level                  Level
+	OutputType             OutputType
+	LogFileRollingType     RollingType
+	LogFileOutputDir       string
+	LogFileContentPattern  string // "DT [L] M"
+	LogFileName            string
+	LogFileNameDatePattern string
+	LogFileExt             string
+	LogFileMaxSize         int64         // 字节
+	LogFileScanInterval    time.Duration // 秒
 }
 
 type Level int
@@ -52,16 +55,17 @@ const (
 	TB
 )
 
-const DATE_FORMAT = "20060102"
-
 var DEFAULT_CONFIG = &Config{
-	Level:               Info,
-	OutputType:          Console,
-	LogFileOutputDir:    ".",
-	LogFileRollingType:  RollingDaily,
-	LogFileName:         "bingo",
-	LogFileMaxSize:      500 * MB,
-	LogFileScanInterval: 1 * time.Second,
+	Level:                  Info,
+	OutputType:             Console | File,
+	LogFileRollingType:     RollingDaily,
+	LogFileOutputDir:       ".",
+	LogFileContentPattern:  "T [L] M",
+	LogFileName:            "default",
+	LogFileNameDatePattern: "20060102",
+	LogFileExt:             ".log",
+	LogFileMaxSize:         500 * MB,
+	LogFileScanInterval:    1 * time.Second,
 }
 
 type Logger struct {
@@ -216,7 +220,7 @@ func (l *Logger) makeFile() {
 		var err error
 		var fileName string = l.config.LogFileName
 		if l.config.LogFileRollingType&RollingDaily == RollingDaily {
-			t := time.Now().Format(DATE_FORMAT)
+			t := time.Now().Format(l.config.LogFileNameDatePattern)
 			fileName += "-" + t
 		}
 		if l.config.LogFileRollingType&RollingSize == RollingSize {
@@ -251,10 +255,10 @@ func (l *Logger) checkFile() {
 	}
 	needRecreate, newFileName := false, l.config.LogFileName
 	if l.config.LogFileRollingType&RollingDaily == RollingDaily {
-		dateString := time.Now().Format(DATE_FORMAT)
-		t, _ := time.Parse(DATE_FORMAT, dateString)
+		dateString := time.Now().Format(l.config.LogFileNameDatePattern)
+		t, _ := time.Parse(l.config.LogFileNameDatePattern, dateString)
 		if len(l.f.Name()) >= len(l.config.LogFileName)+9 {
-			d, err := time.Parse(DATE_FORMAT, l.f.Name()[len(l.config.LogFileName)+1:len(l.config.LogFileName)+9])
+			d, err := time.Parse(l.config.LogFileNameDatePattern, l.f.Name()[len(l.config.LogFileName)+1:len(l.config.LogFileName)+9])
 			if err != nil {
 				log.Println("============== parse date failed!!! ===============")
 			}
@@ -283,7 +287,7 @@ func (l *Logger) checkFile() {
 				newFileName += "-" + l.genFileSeq()
 			} else {
 				needRecreate = true
-				dateString := time.Now().Format(DATE_FORMAT)
+				dateString := time.Now().Format(l.config.LogFileNameDatePattern)
 				newFileName += "-" + dateString
 				newFileName += "-" + l.genFileSeq()
 			}

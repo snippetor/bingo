@@ -6,8 +6,13 @@ var (
 	// bingo框架日志
 	fwLogger *log.Logger
 )
+
 func init() {
 	fwLogger = log.NewLoggerWithConfig(log.DEFAULT_CONFIG)
+}
+
+func Version() string {
+	return "1.0"
 }
 
 func I(format string, v ...interface{}) {

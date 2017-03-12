@@ -11,11 +11,11 @@ const (
 type IMessageCallback func(conn IConn, msgId MessageId, body MessageBody)
 
 // 消息封装器接口
-type iMessagePacker interface {
+type IMessagePacker interface {
 	// 封包，传入消息ID和包体，返回字节集
-	pack(MessageId, MessageBody) []byte
+	Pack(MessageId, MessageBody) []byte
 	// 解包，传入符合包结构的字节集，返回消息ID，包体，剩余内容
-	unpack([]byte) (MessageId, MessageBody, []byte)
+	Unpack([]byte) (MessageId, MessageBody, []byte)
 }
 
 type IConn interface {
@@ -23,6 +23,7 @@ type IConn interface {
 	Close()
 	Address() string
 	read(*[]byte) (int, error)
+	GetNetProtocol() NetProtocol
 }
 
 type iServer interface {
@@ -44,10 +45,4 @@ func (s *absServer) setConfig(key, value string) {
 func (s *absServer) getConfig(key string) (string, bool) {
 	v, ok := s.config[key]
 	return v, ok
-}
-
-// 数据传输协议，即包体格式
-type iProtocol interface {
-	marshal(interface{}) ([]byte, error)
-	unmarshal([]byte, interface{}) error
 }

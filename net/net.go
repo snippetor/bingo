@@ -1,67 +1,44 @@
 package net
 
+import (
+	"github.com/snippetor/bingo"
+)
+
 var (
-	globalPacker       iMessagePacker
-	msgProtocol        iProtocol
-	msgProtoCollection *protoCollection
+	globalPacker IMessagePacker
 )
 
 func init() {
-	globalPacker = iMessagePacker(&defaultMessagePacker{})
-	msgProtoCollection = new(protoCollection)
+	globalPacker = IMessagePacker(&DefaultMessagePacker{})
 }
 
-func getMessagePacker() iMessagePacker {
+func SetDefaultMessagePacker(packer IMessagePacker) {
+	globalPacker = packer
+}
+
+func GetDefaultMessagePacker() IMessagePacker {
 	return globalPacker
 }
 
-type NetProtoType byte
-type MessageProtoType byte
+type NetProtocol byte
 
 const (
-	NetProtoType_TCP       NetProtoType = iota
-	NetProtoType_WebSocket
+	Tcp       NetProtocol = iota
+	WebSocket
+	Http
 )
-
-const (
-	MsgProto_Json     MessageProtoType = iota
-	MsgProto_ProtoBuf
-)
-
-type ServerConfig struct {
-	Net string
-}
 
 // 同步执行网络监听
-// net: "tcp"/"ws"
-func Listen(netProto NetProtoType, msgProto MessageProtoType, port int, callback IMessageCallback) bool {
+func Listen(net NetProtocol, port int, callback IMessageCallback) bool {
 	var server iServer
-	switch netProto {
-	case NetProtoType_TCP:
+	switch net {
+	case Tcp:
 		server = iServer(&tcpServer{})
-	case NetProtoType_WebSocket:
+	case WebSocket:
 		server = iServer(&wsServer{})
-	}
-	switch msgProto {
-	case MsgProto_Json:
-		msgProtocol = iProtocol(&protocolJson{})
-	case MsgProto_ProtoBuf:
-		msgProtocol = iProtocol(&protocolProtoBuf{})
+	default:
+		bingo.E("-- error net type '%d', must be 'ws' or 'tcp' --", net)
+		return false
 	}
 	return server.listen(port, callback)
-}
-
-// 建立消息ID和消息结构的对应关系，用于数据解析
-func PairMsgProto(msgId MessageId, msgStruct interface{}) {
-	msgProtoCollection.put(msgId, msgStruct)
-}
-
-// 删除消息ID和消息结构的对应关系
-func UnpairMsgProto(msgId MessageId) {
-	msgProtoCollection.del(msgId)
-}
-
-// 清空消息ID和消息结构的对应关系
-func ClearMsgProto(msgId MessageId) {
-	msgProtoCollection.clear()
 }

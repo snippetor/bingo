@@ -12,7 +12,7 @@ type tcpConn struct {
 
 func (c *tcpConn) Send(msgId MessageId, body MessageBody) bool {
 	if c.conn != nil && body != nil && len(body) > 0 {
-		c.conn.Write(getMessagePacker().pack(msgId, body))
+		c.conn.Write(GetDefaultMessagePacker().Pack(msgId, body))
 		return true
 	} else {
 		bingo.E("-- send message failed!!! --")
@@ -39,6 +39,10 @@ func (c *tcpConn) Address() string {
 		return c.conn.RemoteAddr().String()
 	}
 	return "0:0:0:0"
+}
+
+func (c *tcpConn) GetNetProtocol() NetProtocol {
+	return Tcp
 }
 
 type tcpServer struct {
@@ -83,9 +87,9 @@ func (s *tcpServer) handleConnection(conn IConn, callback IMessageCallback) {
 			break
 		}
 		byteBuffer = append(byteBuffer, buf[:l]...)
-		packer := getMessagePacker()
+		packer := GetDefaultMessagePacker()
 		for {
-			id, body, remains := packer.unpack(byteBuffer)
+			id, body, remains := packer.Unpack(byteBuffer)
 			if body == nil || len(remains) == 0 {
 				break
 			} else {

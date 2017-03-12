@@ -1,6 +1,8 @@
 package utils
 
-import "os"
+import (
+	"os"
+)
 
 func IsFileExists(name string) bool {
 	if _, err := os.Stat(name); err != nil {

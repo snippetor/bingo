@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"reflect"
-	"flag"
 )
 
 type A interface {
@@ -29,16 +28,18 @@ func main() {
 	//l := log.New(f, "", log.Lmicroseconds)
 	//l.Output(2, "[I] test")
 	//l.Output(2, "[D] test1")
-	var a A
-	a = A(&B{})
-	fmt.Println(reflect.TypeOf(a))
-	(a).func1()
+	var a interface{} = B{}
+	//fmt.Println(reflect.TypeOf(a))
+	//(a).func1()
+	//
+	//addr := flag.String("addr", "localhost:8080", "http service address")
+	//flag.Parse()
+	//fmt.Println(*addr)
+	//
+	//b := make([]byte, 0)
+	//set(&b)
+	//fmt.Println(string(b))
 
-	addr := flag.String("addr", "localhost:8080", "http service address")
-	flag.Parse()
-	fmt.Println(*addr)
-
-	b := make([]byte, 0)
-	set(&b)
-	fmt.Println(string(b))
+	t := reflect.TypeOf(a)
+	fmt.Println(reflect.TypeOf(reflect.New(t).Elem().Interface()))
 }

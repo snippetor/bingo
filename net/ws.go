@@ -13,7 +13,7 @@ type wsConn struct {
 
 func (c *wsConn) Send(msgId MessageId, body MessageBody) bool {
 	if c.conn != nil && body != nil && len(body) > 0 {
-		c.conn.WriteMessage(websocket.BinaryMessage, getMessagePacker().pack(msgId, body))
+		c.conn.WriteMessage(websocket.BinaryMessage, GetDefaultMessagePacker().Pack(msgId, body))
 		return true
 	} else {
 		bingo.E("-- send message failed!!! --")
@@ -44,6 +44,10 @@ func (c *wsConn) Address() string {
 		return c.conn.RemoteAddr().String()
 	}
 	return "0:0:0:0"
+}
+
+func (c *wsConn) GetNetProtocol() NetProtocol {
+	return WebSocket
 }
 
 type wsServer struct {
@@ -83,8 +87,8 @@ func (s *wsServer) handleConnection(conn IConn, callback IMessageCallback) {
 			callback(conn, MSGID_CONNECT_DISCONNECT, nil)
 			break
 		}
-		packer := getMessagePacker()
-		id, body, _ := packer.unpack(buf)
+		packer := GetDefaultMessagePacker()
+		id, body, _ := packer.Unpack(buf)
 		if body != nil {
 			callback(conn, id, body)
 		}

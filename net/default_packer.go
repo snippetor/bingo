@@ -8,10 +8,10 @@ import (
 )
 
 // 消息包
-type defaultMessagePacker struct {
+type DefaultMessagePacker struct {
 }
 
-func (p *defaultMessagePacker) pack(messageId MessageId, content MessageBody) []byte {
+func (p *DefaultMessagePacker) Pack(messageId MessageId, content MessageBody) []byte {
 	if content != nil && len(content) > math.MaxInt32 {
 		bingo.E("-- MessagePacker - body length is too large! %d --", len(content))
 		return nil
@@ -36,7 +36,7 @@ func (p *defaultMessagePacker) pack(messageId MessageId, content MessageBody) []
 	return pk
 }
 
-func (p *defaultMessagePacker) unpack(buffer []byte) (MessageId, MessageBody, []byte) {
+func (p *DefaultMessagePacker) Unpack(buffer []byte) (MessageId, MessageBody, []byte) {
 	if buffer == nil || len(buffer) == 0 {
 		return -1, nil, buffer
 	}

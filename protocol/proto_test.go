@@ -44,10 +44,8 @@ func TestProtocolJson(t *testing.T) {
 func TestProtocolProtobuf(t *testing.T) {
 	p := protocolProtoBuf{}
 	persion := &Person{}
-	var id int32 = 1
-	var name string = "carl"
-	persion.Id = &id
-	persion.Name = &name
+	persion.Id = 1
+	persion.Name = "carl"
 	bs, err := p.marshal(persion)
 	if err != nil {
 		t.Fail()
@@ -58,7 +56,7 @@ func TestProtocolProtobuf(t *testing.T) {
 	if err != nil {
 		t.Fail()
 	}
-	fmt.Println(*persion2.Name)
+	fmt.Println(persion2.Name)
 }
 
 func TestProto(t *testing.T) {
@@ -80,9 +78,7 @@ func TestProto(t *testing.T) {
 	fmt.Println(o.(*JsonObj))
 
 	SetDefaultProtocol(Protobuf)
-	var id int32 = 1
-	var name string = "carl"
-	if bytes, err = Marshal(&Person{Id: &id, Name: &name}); err != nil {
+	if bytes, err = Marshal(&Person{Id: 1, Name: "carl"}); err != nil {
 		t.Fail()
 	}
 	if o, err = Unmarshal(2, bytes, IProtoCollection(&c)); err != nil {

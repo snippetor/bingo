@@ -45,3 +45,22 @@ func TestMessagePacker3(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func BenchmarkDefaultMessagePacker_Pack(b *testing.B) {
+	b.StopTimer()
+	p := &DefaultMessagePacker{}
+	b.StartTimer()
+	for i:=0; i<b.N; i++  {
+		p.Pack(123, []byte(`{"a":"a", "b":1.1}`))
+	}
+}
+
+func BenchmarkDefaultMessagePacker_Unpack(b *testing.B) {
+	b.StopTimer()
+	p := &DefaultMessagePacker{}
+	out := p.Pack(-123, []byte(`{"a":"a", "b":1.1}`))
+	b.StartTimer()
+	for i:=0; i<b.N; i++  {
+		p.Unpack(out)
+	}
+}

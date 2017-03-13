@@ -25,7 +25,6 @@ type NetProtocol byte
 const (
 	Tcp       NetProtocol = iota
 	WebSocket
-	Http
 )
 
 // 同步执行网络监听

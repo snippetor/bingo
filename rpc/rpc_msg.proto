@@ -1,0 +1,17 @@
+package rpc;
+
+enum RPC_MSGID {
+    CALL = -0x100;
+    RETURN = -0x200;
+}
+
+message MethodCall {
+    required string methodName = 1;
+    optional bytes args = 2;
+    optional string version = 3;
+}
+
+message MethodReturn {
+    required MethodCall call = 1;
+    optional bytes result = 2;
+}

@@ -11,18 +11,20 @@ import (
 type DefaultMessagePacker struct {
 }
 
-func (p *DefaultMessagePacker) Pack(messageId MessageId, content MessageBody) []byte {
-	if content != nil && len(content) > math.MaxInt32 {
-		bingo.E("-- MessagePacker - body length is too large! %d --", len(content))
+// TODO 性能优化，目前 3000000	       541 ns/op
+func (p *DefaultMessagePacker) Pack(messageId MessageId, body MessageBody) []byte {
+	bodyLen := len(body)
+	if body != nil && bodyLen > math.MaxInt32 {
+		bingo.E("-- MessagePacker - body length is too large! %d --", len(body))
 		return nil
 	}
 	pk := make([]byte, 0)
 	// 写入长度
 	buf := bytes.NewBuffer([]byte{})
-	if content == nil {
+	if body == nil {
 		binary.Write(buf, binary.BigEndian, 4)
 	} else {
-		binary.Write(buf, binary.BigEndian, int32(len(content))+4)
+		binary.Write(buf, binary.BigEndian, int32(bodyLen)+4)
 	}
 	pk = append(pk, buf.Bytes()...)
 	// 写入id
@@ -30,8 +32,8 @@ func (p *DefaultMessagePacker) Pack(messageId MessageId, content MessageBody) []
 	binary.Write(buf, binary.BigEndian, messageId)
 	pk = append(pk, buf.Bytes()...)
 	// 消息体
-	if content != nil && len(content) > 0 {
-		pk = append(pk, content...)
+	if body != nil && bodyLen > 0 {
+		pk = append(pk, body...)
 	}
 	return pk
 }

@@ -1,5 +1,9 @@
 package net
 
+import (
+	"sync"
+)
+
 type MessageId int32
 type MessageBody []byte
 
@@ -18,31 +22,55 @@ type IMessagePacker interface {
 	Unpack([]byte) (MessageId, MessageBody, []byte)
 }
 
+// 连接接口
 type IConn interface {
 	Send(msgId MessageId, body MessageBody) bool
 	Close()
 	Address() string
 	read(*[]byte) (int, error)
 	GetNetProtocol() NetProtocol
+	Identity() Identity
 }
 
+// 服务器接口
 type iServer interface {
 	listen(int, IMessageCallback) bool
 	close()
 }
 
-type absServer struct {
-	config map[string]string
+// 客户端接口
+type iClient interface {
+	connect(string, IMessageCallback) bool
+	close()
 }
 
-func (s *absServer) setConfig(key, value string) {
-	if s.config == nil {
-		s.config = make(map[string]string)
+// ID生成
+type Identity int64
+
+const (
+	MINMUM_IDENTIFY = 1000000
+	MAXMUM_IDENTIFY = 9999999
+)
+
+var (
+	_identify_ Identity = MINMUM_IDENTIFY
+	l          *sync.Mutex
+)
+
+func init() {
+	l = &sync.Mutex{}
+}
+
+func genIdentity() Identity {
+	l.Lock()
+	_identify_++
+	if _identify_ > MAXMUM_IDENTIFY {
+		_identify_ = MINMUM_IDENTIFY
 	}
-	s.config[key] = value
+	l.Unlock()
+	return _identify_
 }
 
-func (s *absServer) getConfig(key string) (string, bool) {
-	v, ok := s.config[key]
-	return v, ok
+func isValidIdentity(id Identity) bool {
+	return id <= MAXMUM_IDENTIFY && id >= MINMUM_IDENTIFY
 }

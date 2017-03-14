@@ -2,7 +2,6 @@ package rpc
 
 type ICallable interface {
 	Call()
-	Go()
 }
 
 type IMethodRegistry interface {

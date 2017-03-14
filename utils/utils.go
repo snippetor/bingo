@@ -2,6 +2,7 @@ package utils
 
 import (
 	"os"
+	"fmt"
 )
 
 func IsFileExists(name string) bool {

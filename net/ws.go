@@ -5,10 +5,13 @@ import (
 	"github.com/gorilla/websocket"
 	"net/http"
 	"strconv"
+	"net"
+	"github.com/snippetor/bingo/comm"
 )
 
 type wsConn struct {
-	conn *websocket.Conn
+	identity Identity
+	conn     *websocket.Conn
 }
 
 func (c *wsConn) Send(msgId MessageId, body MessageBody) bool {
@@ -50,15 +53,22 @@ func (c *wsConn) GetNetProtocol() NetProtocol {
 	return WebSocket
 }
 
+func (c *wsConn) Identity() Identity {
+	if !isValidIdentity(c.identity) {
+		c.identity = genIdentity()
+	}
+	return c.identity
+}
+
 type wsServer struct {
-	absServer
+	comm.Configable
 	upgrader *websocket.Upgrader
 	callback IMessageCallback
 }
 
 func (s *wsServer) wsHttpHandle(w http.ResponseWriter, r *http.Request) {
 	if conn, err := s.upgrader.Upgrade(w, r, nil); err == nil {
-		go s.handleConnection(IConn(&wsConn{conn: conn}), s.callback)
+		go ws_handleConnection(IConn(&wsConn{conn: conn}), s.callback)
 	} else {
 		bingo.E("-- ws build connection failed!!! --")
 	}
@@ -77,7 +87,33 @@ func (s *wsServer) listen(port int, callback IMessageCallback) bool {
 	return true
 }
 
-func (s *wsServer) handleConnection(conn IConn, callback IMessageCallback) {
+func (s *wsServer) close() {
+}
+
+type wsClient struct {
+	comm.Configable
+	conn *websocket.Conn
+}
+
+func (c *wsClient) connect(serverAddr string, callback IMessageCallback) bool {
+	conn, _, err := websocket.DefaultDialer.Dial(serverAddr, nil)
+	bingo.I("Ws connect server ok :%s", serverAddr)
+	if err != nil {
+		bingo.E(err.Error())
+		return false
+	}
+	ws_handleConnection(IConn(&wsConn{conn}), callback)
+	return true
+}
+
+func (c *wsClient) close() {
+	if c.conn != nil {
+		c.conn.Close()
+		c.conn = nil
+	}
+}
+
+func ws_handleConnection(conn IConn, callback IMessageCallback) {
 	var buf []byte
 	defer conn.Close()
 	for {
@@ -93,7 +129,4 @@ func (s *wsServer) handleConnection(conn IConn, callback IMessageCallback) {
 			callback(conn, id, body)
 		}
 	}
-}
-
-func (s *wsServer) close() {
 }

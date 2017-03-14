@@ -4,10 +4,12 @@ import (
 	"net"
 	"github.com/snippetor/bingo"
 	"strconv"
+	"github.com/snippetor/bingo/comm"
 )
 
 type tcpConn struct {
-	conn *net.TCPConn
+	identity Identity
+	conn     *net.TCPConn
 }
 
 func (c *tcpConn) Send(msgId MessageId, body MessageBody) bool {
@@ -45,8 +47,15 @@ func (c *tcpConn) GetNetProtocol() NetProtocol {
 	return Tcp
 }
 
+func (c *tcpConn) Identity() Identity {
+	if !isValidIdentity(c.identity) {
+		c.identity = genIdentity()
+	}
+	return c.identity
+}
+
 type tcpServer struct {
-	absServer
+	comm.Configable
 	listener *net.TCPListener
 }
 
@@ -70,12 +79,50 @@ func (s *tcpServer) listen(port int, callback IMessageCallback) bool {
 			continue
 		}
 		bingo.I(conn.RemoteAddr().String(), " tcp connect success")
-		go s.handleConnection(IConn(&tcpConn{conn}), callback)
+		go tcp_handleConnection(IConn(&tcpConn{conn}), callback)
 	}
 	return true
 }
 
-func (s *tcpServer) handleConnection(conn IConn, callback IMessageCallback) {
+func (s*tcpServer) close() {
+	if s.listener != nil {
+		s.listener.Close()
+		s.listener = nil
+	}
+}
+
+type tcpClient struct {
+	comm.Configable
+	conn *net.TCPConn
+}
+
+func (c *tcpClient) connect(serverAddr string, callback IMessageCallback) bool {
+	addr, err := net.ResolveTCPAddr("tcp", serverAddr)
+	if err != nil {
+		bingo.E(err.Error())
+		return false
+	}
+	conn, err := net.DialTCP("tcp", nil, addr)
+	if err != nil {
+		bingo.E(err.Error())
+		return false
+	}
+	defer conn.Close()
+	c.conn = conn
+	bingo.I("Tcp connect server ok :%s", serverAddr)
+	tcp_handleConnection(IConn(&tcpConn{conn}), callback)
+	return true
+}
+
+func (c *tcpClient) close() {
+	if c.conn != nil {
+		c.conn.Close()
+		c.conn = nil
+	}
+}
+
+// 处理消息流
+func tcp_handleConnection(conn IConn, callback IMessageCallback) {
 	buf := make([]byte, 4096) // 4KB
 	byteBuffer := make([]byte, 0)
 	defer conn.Close()
@@ -96,12 +143,5 @@ func (s *tcpServer) handleConnection(conn IConn, callback IMessageCallback) {
 				callback(conn, id, body)
 			}
 		}
-	}
-}
-
-func (s*tcpServer) close() {
-	if s.listener != nil {
-		s.listener.Close()
-		s.listener = nil
 	}
 }

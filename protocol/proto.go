@@ -57,7 +57,7 @@ func Marshal(v interface{}) (net.MessageBody, error) {
 
 // 尝试使用注册的消息ID和结构体对来解析消息体，如果解析无误将返回对应的消息结构体
 // 注意：此方法返回的是消息结构体的指针，而非值
-func Unmarshal(msgId net.MessageId, data net.MessageBody, collection IProtoCollection) (interface{}, error) {
+func UnmarshalTo(msgId net.MessageId, data net.MessageBody, collection IProtoCollection) (interface{}, error) {
 	if v, ok := collection.Get(msgId, protoVersion); ok {
 		if err := msgProto.unmarshal(data, v); err != nil {
 			return nil, err
@@ -70,4 +70,12 @@ func Unmarshal(msgId net.MessageId, data net.MessageBody, collection IProtoColle
 		return v, nil
 	}
 	return nil, errors.New("no found message struct for msgid #" + strconv.Itoa(int(msgId)))
+}
+
+// 直接解析成结构体
+func Unmarshal(data net.MessageBody, v interface{}) error {
+	if err := msgProto.unmarshal(data, v); err != nil {
+		return err
+	}
+	return nil
 }

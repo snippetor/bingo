@@ -1,4 +1,4 @@
-package test;
+package tools;
 
 message Person {
     required int32 id = 1;

@@ -71,7 +71,7 @@ func TestProto(t *testing.T) {
 		t.Fail()
 	}
 	var o interface{}
-	if o, err = Unmarshal(1, bytes, IProtoCollection(&c)); err != nil {
+	if o, err = UnmarshalTo(1, bytes, IProtoCollection(&c)); err != nil {
 		t.Fail()
 	}
 
@@ -81,7 +81,7 @@ func TestProto(t *testing.T) {
 	if bytes, err = Marshal(&Person{Id: 1, Name: "carl"}); err != nil {
 		t.Fail()
 	}
-	if o, err = Unmarshal(2, bytes, IProtoCollection(&c)); err != nil {
+	if o, err = UnmarshalTo(2, bytes, IProtoCollection(&c)); err != nil {
 		t.Fail()
 	}
 

@@ -8,8 +8,8 @@ import (
 )
 
 type tcpConn struct {
-	identity Identity
 	conn     *net.TCPConn
+	identity Identity
 }
 
 func (c *tcpConn) Send(msgId MessageId, body MessageBody) bool {
@@ -79,7 +79,7 @@ func (s *tcpServer) listen(port int, callback IMessageCallback) bool {
 			continue
 		}
 		bingo.I(conn.RemoteAddr().String(), " tcp connect success")
-		go tcp_handleConnection(IConn(&tcpConn{conn}), callback)
+		go tcp_handleConnection(&IConn(&tcpConn{conn: conn}), callback)
 	}
 	return true
 }
@@ -110,7 +110,7 @@ func (c *tcpClient) connect(serverAddr string, callback IMessageCallback) bool {
 	defer conn.Close()
 	c.conn = conn
 	bingo.I("Tcp connect server ok :%s", serverAddr)
-	tcp_handleConnection(IConn(&tcpConn{conn}), callback)
+	tcp_handleConnection(IConn(&tcpConn{conn: conn}), callback)
 	return true
 }
 

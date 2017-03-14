@@ -42,4 +42,8 @@ func main() {
 
 	t := reflect.TypeOf(a)
 	fmt.Println(reflect.TypeOf(reflect.New(t).Elem().Interface()))
+
+	m := make(map[string]string)
+	m["a"] = "a"
+	fmt.Printf("%s", m)
 }

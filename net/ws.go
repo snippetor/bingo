@@ -10,8 +10,8 @@ import (
 )
 
 type wsConn struct {
-	identity Identity
 	conn     *websocket.Conn
+	identity Identity
 }
 
 func (c *wsConn) Send(msgId MessageId, body MessageBody) bool {

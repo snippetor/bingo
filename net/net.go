@@ -28,31 +28,63 @@ const (
 )
 
 // 同步执行网络监听
-func Listen(net NetProtocol, port int, callback IMessageCallback) bool {
-	var server iServer
+func Listen(net NetProtocol, port int, callback IMessageCallback) (IServer, bool) {
+	var server IServer
 	switch net {
 	case Tcp:
-		server = iServer(&tcpServer{})
+		server = IServer(&tcpServer{})
 	case WebSocket:
-		server = iServer(&wsServer{})
+		server = IServer(&wsServer{})
 	default:
 		bingo.E("-- error net type '%d', must be 'ws' or 'tcp' --", net)
-		return false
+		return nil, false
 	}
-	return server.listen(port, callback)
+	return server, server.listen(port, callback)
+}
+
+// 异步执行网络监听
+func GoListen(net NetProtocol, port int, callback IMessageCallback) IServer {
+	var server IServer
+	switch net {
+	case Tcp:
+		server = IServer(&tcpServer{})
+	case WebSocket:
+		server = IServer(&wsServer{})
+	default:
+		bingo.E("-- error net type '%d', must be 'ws' or 'tcp' --", net)
+		return nil
+	}
+	go server.listen(port, callback)
+	return server
 }
 
 // 同步连接服务器
-func Connect(net NetProtocol, serverAddr string, callback IMessageCallback) bool {
-	var client iClient
+func Connect(net NetProtocol, serverAddr string, callback IMessageCallback) (IClient, bool) {
+	var client IClient
 	switch net {
 	case Tcp:
-		client = iClient(&tcpClient{})
+		client = IClient(&tcpClient{})
 	case WebSocket:
-		client = iClient(&wsClient{})
+		client = IClient(&wsClient{})
 	default:
 		bingo.E("-- error net type '%d', must be 'ws' or 'tcp' --", net)
-		return false
+		return nil, false
 	}
-	return client.connect(serverAddr, callback)
+	return client, client.connect(serverAddr, callback)
+}
+
+// 异步连接服务器
+func GoConnect(net NetProtocol, serverAddr string, callback IMessageCallback) IClient {
+	var client IClient
+	switch net {
+	case Tcp:
+		client = IClient(&tcpClient{})
+	case WebSocket:
+		client = IClient(&wsClient{})
+	default:
+		bingo.E("-- error net type '%d', must be 'ws' or 'tcp' --", net)
+		return nil
+	}
+	go client.connect(serverAddr, callback)
+	return client
 }

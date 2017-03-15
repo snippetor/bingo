@@ -1,7 +1,5 @@
 package comm
 
-import "sync"
-
 // 可配置接口
 type Configable struct {
 	config map[string]string

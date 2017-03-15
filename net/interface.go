@@ -8,7 +8,7 @@ type MessageId int32
 type MessageBody []byte
 
 const (
-	MSGID_CONNECT_DISCONNECT = -1024
+	MSGID_CONNECT_DISCONNECT = -1
 )
 
 // 消息回调
@@ -33,19 +33,21 @@ type IConn interface {
 }
 
 // 服务器接口
-type iServer interface {
+type IServer interface {
 	listen(int, IMessageCallback) bool
-	close()
+	GetConnection(Identity) (IConn, bool)
+	Close()
 }
 
 // 客户端接口
-type iClient interface {
+type IClient interface {
 	connect(string, IMessageCallback) bool
-	close()
+	Send(msgId MessageId, body MessageBody) bool
+	Close()
 }
 
 // ID生成
-type Identity int64
+type Identity int
 
 const (
 	MINMUM_IDENTIFY = 1000000

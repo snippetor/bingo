@@ -9,7 +9,8 @@
 		rpc_msg.proto
 
 	It has these top-level messages:
-		MethodCall
+		RPCHandShake
+		RPCMethodCall
 */
 package rpc
 
@@ -34,14 +35,17 @@ const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 type RPC_MSGID int32
 
 const (
-	RPC_MSGID_CALL RPC_MSGID = -256
+	RPC_MSGID_HANDSHAKE RPC_MSGID = -256
+	RPC_MSGID_CALL      RPC_MSGID = -512
 )
 
 var RPC_MSGID_name = map[int32]string{
-	-256: "CALL",
+	-256: "HANDSHAKE",
+	-512: "CALL",
 }
 var RPC_MSGID_value = map[string]int32{
-	"CALL": -256,
+	"HANDSHAKE": -256,
+	"CALL":      -512,
 }
 
 func (x RPC_MSGID) Enum() *RPC_MSGID {
@@ -62,32 +66,56 @@ func (x *RPC_MSGID) UnmarshalJSON(data []byte) error {
 }
 func (RPC_MSGID) EnumDescriptor() ([]byte, []int) { return fileDescriptorRpcMsg, []int{0} }
 
-type MethodCall struct {
+type RPCHandShake struct {
+	EndName    string   `protobuf:"bytes,1,req,name=endName" json:"endName"`
+	EndAbility []string `protobuf:"bytes,2,rep,name=endAbility" json:"endAbility,omitempty"`
+}
+
+func (m *RPCHandShake) Reset()                    { *m = RPCHandShake{} }
+func (m *RPCHandShake) String() string            { return proto.CompactTextString(m) }
+func (*RPCHandShake) ProtoMessage()               {}
+func (*RPCHandShake) Descriptor() ([]byte, []int) { return fileDescriptorRpcMsg, []int{0} }
+
+func (m *RPCHandShake) GetEndName() string {
+	if m != nil {
+		return m.EndName
+	}
+	return ""
+}
+
+func (m *RPCHandShake) GetEndAbility() []string {
+	if m != nil {
+		return m.EndAbility
+	}
+	return nil
+}
+
+type RPCMethodCall struct {
 	MethodName string            `protobuf:"bytes,1,req,name=methodName" json:"methodName"`
 	Args       map[string]string `protobuf:"bytes,2,rep,name=args" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Version    string            `protobuf:"bytes,3,opt,name=version" json:"version"`
 }
 
-func (m *MethodCall) Reset()                    { *m = MethodCall{} }
-func (m *MethodCall) String() string            { return proto.CompactTextString(m) }
-func (*MethodCall) ProtoMessage()               {}
-func (*MethodCall) Descriptor() ([]byte, []int) { return fileDescriptorRpcMsg, []int{0} }
+func (m *RPCMethodCall) Reset()                    { *m = RPCMethodCall{} }
+func (m *RPCMethodCall) String() string            { return proto.CompactTextString(m) }
+func (*RPCMethodCall) ProtoMessage()               {}
+func (*RPCMethodCall) Descriptor() ([]byte, []int) { return fileDescriptorRpcMsg, []int{1} }
 
-func (m *MethodCall) GetMethodName() string {
+func (m *RPCMethodCall) GetMethodName() string {
 	if m != nil {
 		return m.MethodName
 	}
 	return ""
 }
 
-func (m *MethodCall) GetArgs() map[string]string {
+func (m *RPCMethodCall) GetArgs() map[string]string {
 	if m != nil {
 		return m.Args
 	}
 	return nil
 }
 
-func (m *MethodCall) GetVersion() string {
+func (m *RPCMethodCall) GetVersion() string {
 	if m != nil {
 		return m.Version
 	}
@@ -95,10 +123,11 @@ func (m *MethodCall) GetVersion() string {
 }
 
 func init() {
-	proto.RegisterType((*MethodCall)(nil), "rpc.MethodCall")
+	proto.RegisterType((*RPCHandShake)(nil), "rpc.RPCHandShake")
+	proto.RegisterType((*RPCMethodCall)(nil), "rpc.RPCMethodCall")
 	proto.RegisterEnum("rpc.RPC_MSGID", RPC_MSGID_name, RPC_MSGID_value)
 }
-func (m *MethodCall) Marshal() (dAtA []byte, err error) {
+func (m *RPCHandShake) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -108,7 +137,44 @@ func (m *MethodCall) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *MethodCall) MarshalTo(dAtA []byte) (int, error) {
+func (m *RPCHandShake) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintRpcMsg(dAtA, i, uint64(len(m.EndName)))
+	i += copy(dAtA[i:], m.EndName)
+	if len(m.EndAbility) > 0 {
+		for _, s := range m.EndAbility {
+			dAtA[i] = 0x12
+			i++
+			l = len(s)
+			for l >= 1<<7 {
+				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
+				l >>= 7
+				i++
+			}
+			dAtA[i] = uint8(l)
+			i++
+			i += copy(dAtA[i:], s)
+		}
+	}
+	return i, nil
+}
+
+func (m *RPCMethodCall) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *RPCMethodCall) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -168,7 +234,21 @@ func encodeVarintRpcMsg(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
-func (m *MethodCall) Size() (n int) {
+func (m *RPCHandShake) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.EndName)
+	n += 1 + l + sovRpcMsg(uint64(l))
+	if len(m.EndAbility) > 0 {
+		for _, s := range m.EndAbility {
+			l = len(s)
+			n += 1 + l + sovRpcMsg(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *RPCMethodCall) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.MethodName)
@@ -199,7 +279,7 @@ func sovRpcMsg(x uint64) (n int) {
 func sozRpcMsg(x uint64) (n int) {
 	return sovRpcMsg(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (m *MethodCall) Unmarshal(dAtA []byte) error {
+func (m *RPCHandShake) Unmarshal(dAtA []byte) error {
 	var hasFields [1]uint64
 	l := len(dAtA)
 	iNdEx := 0
@@ -223,10 +303,123 @@ func (m *MethodCall) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: MethodCall: wiretype end group for non-group")
+			return fmt.Errorf("proto: RPCHandShake: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: MethodCall: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: RPCHandShake: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EndName", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpcMsg
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRpcMsg
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.EndName = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EndAbility", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpcMsg
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRpcMsg
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.EndAbility = append(m.EndAbility, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRpcMsg(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthRpcMsg
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("endName")
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *RPCMethodCall) Unmarshal(dAtA []byte) error {
+	var hasFields [1]uint64
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRpcMsg
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: RPCMethodCall: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: RPCMethodCall: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -536,20 +729,24 @@ var (
 func init() { proto.RegisterFile("rpc_msg.proto", fileDescriptorRpcMsg) }
 
 var fileDescriptorRpcMsg = []byte{
-	// 225 bytes of a gzipped FileDescriptorProto
+	// 292 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xe2, 0xe2, 0x2d, 0x2a, 0x48, 0x8e,
-	0xcf, 0x2d, 0x4e, 0xd7, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x2e, 0x2a, 0x48, 0x56, 0x3a,
-	0xc6, 0xc8, 0xc5, 0xe5, 0x9b, 0x5a, 0x92, 0x91, 0x9f, 0xe2, 0x9c, 0x98, 0x93, 0x23, 0xa4, 0xc2,
-	0xc5, 0x95, 0x0b, 0xe6, 0xf9, 0x25, 0xe6, 0xa6, 0x4a, 0x30, 0x2a, 0x30, 0x69, 0x70, 0x3a, 0xb1,
-	0x9c, 0xb8, 0x27, 0xcf, 0x10, 0x84, 0x24, 0x2e, 0xa4, 0xcb, 0xc5, 0x92, 0x58, 0x94, 0x5e, 0x2c,
-	0xc1, 0xa4, 0xc0, 0xac, 0xc1, 0x6d, 0x24, 0xa9, 0x57, 0x54, 0x90, 0xac, 0x87, 0x30, 0x44, 0xcf,
-	0xb1, 0x28, 0xbd, 0xd8, 0x35, 0xaf, 0xa4, 0xa8, 0x32, 0x08, 0xac, 0x4c, 0x48, 0x8e, 0x8b, 0xbd,
-	0x2c, 0xb5, 0xa8, 0x38, 0x33, 0x3f, 0x4f, 0x82, 0x59, 0x81, 0x11, 0x6e, 0x22, 0x4c, 0x50, 0xca,
-	0x99, 0x8b, 0x13, 0xae, 0x45, 0x48, 0x8c, 0x8b, 0x39, 0x3b, 0xb5, 0x52, 0x82, 0x11, 0x49, 0x21,
-	0x48, 0x40, 0x48, 0x8a, 0x8b, 0xb5, 0x2c, 0x31, 0xa7, 0x34, 0x55, 0x82, 0x09, 0x49, 0x06, 0x22,
-	0x64, 0xc5, 0x64, 0xc1, 0xa8, 0x25, 0xc7, 0xc5, 0x19, 0x14, 0xe0, 0x1c, 0xef, 0x1b, 0xec, 0xee,
-	0xe9, 0x22, 0x24, 0xc8, 0xc5, 0xe2, 0xec, 0xe8, 0xe3, 0x23, 0xd0, 0xf0, 0xef, 0x3f, 0x04, 0x30,
-	0x3a, 0x09, 0x9c, 0x78, 0x24, 0xc7, 0x78, 0xe1, 0x91, 0x1c, 0xe3, 0x83, 0x47, 0x72, 0x8c, 0x13,
-	0x1e, 0xcb, 0x31, 0x00, 0x02, 0x00, 0x00, 0xff, 0xff, 0x11, 0xc7, 0xa9, 0xe3, 0x0f, 0x01, 0x00,
-	0x00,
+	0xcf, 0x2d, 0x4e, 0xd7, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x2e, 0x2a, 0x48, 0x56, 0xf2,
+	0xe3, 0xe2, 0x09, 0x0a, 0x70, 0xf6, 0x48, 0xcc, 0x4b, 0x09, 0xce, 0x48, 0xcc, 0x4e, 0x15, 0x92,
+	0xe3, 0x62, 0x4f, 0xcd, 0x4b, 0xf1, 0x4b, 0xcc, 0x4d, 0x95, 0x60, 0x54, 0x60, 0xd2, 0xe0, 0x74,
+	0x62, 0x39, 0x71, 0x4f, 0x9e, 0x21, 0x08, 0x26, 0x28, 0x24, 0xc7, 0xc5, 0x95, 0x9a, 0x97, 0xe2,
+	0x98, 0x94, 0x99, 0x93, 0x59, 0x52, 0x29, 0xc1, 0xa4, 0xc0, 0xac, 0xc1, 0x19, 0x84, 0x24, 0xa2,
+	0x74, 0x86, 0x91, 0x8b, 0x37, 0x28, 0xc0, 0xd9, 0x37, 0xb5, 0x24, 0x23, 0x3f, 0xc5, 0x39, 0x31,
+	0x27, 0x47, 0x48, 0x85, 0x8b, 0x2b, 0x17, 0xcc, 0xc3, 0x30, 0x14, 0x49, 0x5c, 0xc8, 0x80, 0x8b,
+	0x25, 0xb1, 0x28, 0xbd, 0x18, 0x6c, 0x22, 0xb7, 0x91, 0x8c, 0x5e, 0x51, 0x41, 0xb2, 0x1e, 0x8a,
+	0x39, 0x7a, 0x8e, 0x45, 0xe9, 0xc5, 0xae, 0x79, 0x25, 0x45, 0x95, 0x41, 0x60, 0x95, 0x20, 0x97,
+	0x96, 0xa5, 0x16, 0x15, 0x67, 0xe6, 0xe7, 0x49, 0x30, 0x2b, 0x30, 0x22, 0x5c, 0x0a, 0x15, 0x94,
+	0x72, 0xe6, 0xe2, 0x84, 0x6b, 0x11, 0x12, 0xe3, 0x62, 0xce, 0x4e, 0xad, 0x94, 0x60, 0x44, 0x52,
+	0x08, 0x12, 0x10, 0x92, 0xe2, 0x62, 0x2d, 0x4b, 0xcc, 0x29, 0x4d, 0x95, 0x60, 0x42, 0x92, 0x81,
+	0x08, 0x59, 0x31, 0x59, 0x30, 0x6a, 0x99, 0x71, 0x71, 0x06, 0x05, 0x38, 0xc7, 0xfb, 0x06, 0xbb,
+	0x7b, 0xba, 0x08, 0x89, 0x71, 0x71, 0x7a, 0x38, 0xfa, 0xb9, 0x04, 0x7b, 0x38, 0x7a, 0xbb, 0x0a,
+	0x34, 0xfc, 0xfb, 0x0f, 0x01, 0x8c, 0x42, 0x82, 0x5c, 0x2c, 0xce, 0x8e, 0x3e, 0x3e, 0x02, 0x0d,
+	0x7f, 0x60, 0x42, 0x4e, 0x02, 0x27, 0x1e, 0xc9, 0x31, 0x5e, 0x78, 0x24, 0xc7, 0xf8, 0xe0, 0x91,
+	0x1c, 0xe3, 0x84, 0xc7, 0x72, 0x0c, 0x80, 0x00, 0x00, 0x00, 0xff, 0xff, 0xc6, 0x30, 0xd2, 0xae,
+	0x7d, 0x01, 0x00, 0x00,
 }

@@ -5,6 +5,7 @@ import (
 	"github.com/snippetor/bingo"
 	"strconv"
 	"github.com/snippetor/bingo/comm"
+	"sync"
 )
 
 type tcpConn struct {
@@ -56,7 +57,9 @@ func (c *tcpConn) Identity() Identity {
 
 type tcpServer struct {
 	comm.Configable
+	sync.RWMutex
 	listener *net.TCPListener
+	clients  map[Identity]IConn
 }
 
 func (s *tcpServer) listen(port int, callback IMessageCallback) bool {
@@ -72,6 +75,7 @@ func (s *tcpServer) listen(port int, callback IMessageCallback) bool {
 	}
 	defer listener.Close()
 	s.listener = listener
+	s.clients = make(map[Identity]IConn, 0)
 	bingo.I("Tcp server runnning on :%d", port)
 	for {
 		conn, err := listener.AcceptTCP()
@@ -79,12 +83,57 @@ func (s *tcpServer) listen(port int, callback IMessageCallback) bool {
 			continue
 		}
 		bingo.I(conn.RemoteAddr().String(), " tcp connect success")
-		go tcp_handleConnection(&IConn(&tcpConn{conn: conn}), callback)
+		c := IConn(&tcpConn{conn: conn})
+		s.Lock()
+		s.clients[c.Identity()] = c
+		s.Unlock()
+		go s.handleConnection(c, callback)
 	}
 	return true
 }
 
-func (s*tcpServer) close() {
+// 处理消息流
+func (s *tcpServer) handleConnection(conn IConn, callback IMessageCallback) {
+	buf := make([]byte, 4096) // 4KB
+	byteBuffer := make([]byte, 0)
+	defer conn.Close()
+	for {
+		l, err := conn.read(&buf)
+		if err != nil {
+			bingo.E(err.Error())
+			callback(conn, MSGID_CONNECT_DISCONNECT, nil)
+			s.Lock()
+			delete(s.clients, conn.Identity())
+			s.Unlock()
+			break
+		}
+		byteBuffer = append(byteBuffer, buf[:l]...)
+		packer := GetDefaultMessagePacker()
+		for {
+			id, body, remains := packer.Unpack(byteBuffer)
+			if body == nil || len(remains) == 0 {
+				break
+			} else {
+				callback(conn, id, body)
+			}
+		}
+	}
+}
+
+func (s *tcpServer) GetConnection(identity Identity) (IConn, bool) {
+	s.RLock()
+	defer s.RUnlock()
+	if s.clients == nil {
+		return nil, false
+	} else {
+		identity, ok := s.clients[identity]
+		return identity, ok
+	}
+}
+
+func (s *tcpServer) Close() {
+	s.Lock()
+	defer s.Unlock()
 	if s.listener != nil {
 		s.listener.Close()
 		s.listener = nil
@@ -93,7 +142,8 @@ func (s*tcpServer) close() {
 
 type tcpClient struct {
 	comm.Configable
-	conn *net.TCPConn
+	sync.Mutex
+	conn IConn
 }
 
 func (c *tcpClient) connect(serverAddr string, callback IMessageCallback) bool {
@@ -108,21 +158,14 @@ func (c *tcpClient) connect(serverAddr string, callback IMessageCallback) bool {
 		return false
 	}
 	defer conn.Close()
-	c.conn = conn
+	c.conn = IConn(&tcpConn{conn: conn})
 	bingo.I("Tcp connect server ok :%s", serverAddr)
-	tcp_handleConnection(IConn(&tcpConn{conn: conn}), callback)
+	c.handleConnection(c.conn, callback)
 	return true
 }
 
-func (c *tcpClient) close() {
-	if c.conn != nil {
-		c.conn.Close()
-		c.conn = nil
-	}
-}
-
 // 处理消息流
-func tcp_handleConnection(conn IConn, callback IMessageCallback) {
+func (c *tcpClient) handleConnection(conn IConn, callback IMessageCallback) {
 	buf := make([]byte, 4096) // 4KB
 	byteBuffer := make([]byte, 0)
 	defer conn.Close()
@@ -131,6 +174,7 @@ func tcp_handleConnection(conn IConn, callback IMessageCallback) {
 		if err != nil {
 			bingo.E(err.Error())
 			callback(conn, MSGID_CONNECT_DISCONNECT, nil)
+			c.conn = nil
 			break
 		}
 		byteBuffer = append(byteBuffer, buf[:l]...)
@@ -143,5 +187,23 @@ func tcp_handleConnection(conn IConn, callback IMessageCallback) {
 				callback(conn, id, body)
 			}
 		}
+	}
+}
+
+func (c *tcpClient) Send(msgId MessageId, body MessageBody) bool {
+	c.Lock()
+	defer c.Unlock()
+	if c.conn != nil {
+		return c.conn.Send(msgId, body)
+	}
+	return false
+}
+
+func (c *tcpClient) Close() {
+	c.Lock()
+	defer c.Unlock()
+	if c.conn != nil {
+		c.conn.Close()
+		c.conn = nil
 	}
 }

@@ -1,0 +1,5 @@
+Unstaged changes after reset:
+M	.idea/libraries/GOPATH__bingo_.xml
+M	.idea/libraries/Go_SDK.xml
+M	.idea/workspace.xml
+D	protocol/bingo-20170312.log

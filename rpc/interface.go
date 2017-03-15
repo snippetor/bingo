@@ -1,7 +1,7 @@
 package rpc
 
 type ICallable interface {
-	Call()
+	Call(string, map[string]string, string) bool
 }
 
 type IMethodRegistry interface {

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"net"
 	"github.com/snippetor/bingo/comm"
+	"sync"
 )
 
 type wsConn struct {
@@ -62,13 +63,19 @@ func (c *wsConn) Identity() Identity {
 
 type wsServer struct {
 	comm.Configable
+	sync.RWMutex
 	upgrader *websocket.Upgrader
 	callback IMessageCallback
+	clients  map[Identity]IConn
 }
 
 func (s *wsServer) wsHttpHandle(w http.ResponseWriter, r *http.Request) {
 	if conn, err := s.upgrader.Upgrade(w, r, nil); err == nil {
-		go ws_handleConnection(IConn(&wsConn{conn: conn}), s.callback)
+		c := IConn(&wsConn{conn: conn})
+		s.Lock()
+		s.clients[c.Identity()] = c
+		s.Unlock()
+		go s.handleConnection(c, s.callback)
 	} else {
 		bingo.E("-- ws build connection failed!!! --")
 	}
@@ -79,6 +86,7 @@ func (s *wsServer) listen(port int, callback IMessageCallback) bool {
 		s.upgrader = &websocket.Upgrader{}
 	}
 	s.callback = callback
+	s.clients = make(map[Identity]IConn, 0)
 	http.HandleFunc("/", s.wsHttpHandle)
 	if err := http.ListenAndServe("localhost:"+strconv.Itoa(port), nil); err != nil {
 		bingo.E(err.Error())
@@ -87,12 +95,45 @@ func (s *wsServer) listen(port int, callback IMessageCallback) bool {
 	return true
 }
 
-func (s *wsServer) close() {
+func (s *wsServer) Close() {
+}
+
+func (s *wsServer) handleConnection(conn IConn, callback IMessageCallback) {
+	var buf []byte
+	defer conn.Close()
+	for {
+		_, err := conn.read(&buf)
+		if err != nil {
+			bingo.E(err.Error())
+			callback(conn, MSGID_CONNECT_DISCONNECT, nil)
+			s.Lock()
+			delete(s.clients, conn.Identity())
+			s.Unlock()
+			break
+		}
+		packer := GetDefaultMessagePacker()
+		id, body, _ := packer.Unpack(buf)
+		if body != nil {
+			callback(conn, id, body)
+		}
+	}
+}
+
+func (s *wsServer) GetConnection(identity Identity) (IConn, bool) {
+	s.RLock()
+	defer s.RUnlock()
+	if s.clients == nil {
+		return nil, false
+	} else {
+		identity, ok := s.clients[identity]
+		return identity, ok
+	}
 }
 
 type wsClient struct {
 	comm.Configable
-	conn *websocket.Conn
+	sync.Mutex
+	conn IConn
 }
 
 func (c *wsClient) connect(serverAddr string, callback IMessageCallback) bool {
@@ -102,18 +143,12 @@ func (c *wsClient) connect(serverAddr string, callback IMessageCallback) bool {
 		bingo.E(err.Error())
 		return false
 	}
-	ws_handleConnection(IConn(&wsConn{conn}), callback)
+	c.conn = IConn(&wsConn{conn:conn})
+	c.handleConnection(c.conn, callback)
 	return true
 }
 
-func (c *wsClient) close() {
-	if c.conn != nil {
-		c.conn.Close()
-		c.conn = nil
-	}
-}
-
-func ws_handleConnection(conn IConn, callback IMessageCallback) {
+func (c *wsClient) handleConnection(conn IConn, callback IMessageCallback) {
 	var buf []byte
 	defer conn.Close()
 	for {
@@ -121,6 +156,7 @@ func ws_handleConnection(conn IConn, callback IMessageCallback) {
 		if err != nil {
 			bingo.E(err.Error())
 			callback(conn, MSGID_CONNECT_DISCONNECT, nil)
+			c.conn = nil
 			break
 		}
 		packer := GetDefaultMessagePacker()
@@ -128,5 +164,21 @@ func ws_handleConnection(conn IConn, callback IMessageCallback) {
 		if body != nil {
 			callback(conn, id, body)
 		}
+	}
+}
+
+func (c *wsClient) Send(msgId MessageId, body MessageBody) bool {
+	c.Lock()
+	defer c.Unlock()
+	if c.conn != nil {
+		return c.conn.Send(msgId, body)
+	}
+	return false
+}
+
+func (c *wsClient) Close() {
+	if c.conn != nil {
+		c.conn.Close()
+		c.conn = nil
 	}
 }

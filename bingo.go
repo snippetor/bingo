@@ -30,3 +30,7 @@ func W(format string, v ...interface{}) {
 func E(format string, v ...interface{}) {
 	fwLogger.E(format, v...)
 }
+
+type Node struct {
+}
+

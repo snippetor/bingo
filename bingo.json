@@ -1,0 +1,33 @@
+{
+  "domains": [
+    "192.168.1.128"
+  ],
+  "node": [
+    {
+      "name": "master",
+      "domain": 0,
+      "service": [
+        {
+          "type": "tcp",
+          "port": 9090,
+          "proto": "protobuf"
+        }
+      ]
+    },
+    {
+      "name": "gate1",
+      "domain": 0,
+      "net": [
+        {
+          "type": "tcp",
+          "port": 9090,
+          "proto": "protobuf"
+        }
+      ]
+    },
+    {
+      "name": "game1",
+      "domain": 0
+    }
+  ]
+}

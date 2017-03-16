@@ -7,11 +7,9 @@ enum RPC_MSGID {
 
 message RPCHandShake {
     required string endName = 1; // 来端名称
-    repeated string endAbility = 2; // 来端能力，存有方法列表，如果为空，表示全能
 }
 
 message RPCMethodCall {
     required string methodName = 1;
     map<string, string> args = 2;
-    optional string version = 3;
 }

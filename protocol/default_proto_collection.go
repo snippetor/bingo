@@ -44,6 +44,10 @@ func (c *DefaultProtoCollection) Get(id net.MessageId, protoVersion string) (int
 	if ok {
 		return reflect.New(t).Interface(), ok
 	} else {
+		t, ok = c.m[c.makeKey(id, "")]
+		if ok {
+			return reflect.New(t).Interface(), ok
+		}
 		return nil, false
 	}
 }
@@ -78,5 +82,8 @@ func (c *DefaultProtoCollection) Size() int {
 }
 
 func (c *DefaultProtoCollection) makeKey(id net.MessageId, protoVersion string) string {
+	if protoVersion == "" {
+		return strconv.Itoa(int(id))
+	}
 	return strconv.Itoa(int(id)) + "-" + protoVersion
 }

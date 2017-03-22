@@ -9,8 +9,8 @@ import (
 )
 
 type tcpConn struct {
-	conn     *net.TCPConn
-	identity Identity
+	conn *net.TCPConn
+	absConn
 }
 
 func (c *tcpConn) Send(msgId MessageId, body MessageBody) bool {
@@ -18,7 +18,7 @@ func (c *tcpConn) Send(msgId MessageId, body MessageBody) bool {
 		c.conn.Write(GetDefaultMessagePacker().Pack(msgId, body))
 		return true
 	} else {
-		bingo.E("-- send message failed!!! --")
+		bingo.W("-- send message failed!!! --")
 		return false
 	}
 }
@@ -46,13 +46,6 @@ func (c *tcpConn) Address() string {
 
 func (c *tcpConn) GetNetProtocol() NetProtocol {
 	return Tcp
-}
-
-func (c *tcpConn) Identity() Identity {
-	if !isValidIdentity(c.identity) {
-		c.identity = genIdentity()
-	}
-	return c.identity
 }
 
 type tcpServer struct {
@@ -84,6 +77,7 @@ func (s *tcpServer) listen(port int, callback IMessageCallback) bool {
 		}
 		bingo.I(conn.RemoteAddr().String(), " tcp connect success")
 		c := IConn(&tcpConn{conn: conn})
+		c.setState(STATE_CONNECTED)
 		s.Lock()
 		s.clients[c.Identity()] = c
 		s.Unlock()
@@ -101,6 +95,7 @@ func (s *tcpServer) handleConnection(conn IConn, callback IMessageCallback) {
 		l, err := conn.read(&buf)
 		if err != nil {
 			bingo.E(err.Error())
+			conn.setState(STATE_CLOSED)
 			callback(conn, MSGID_CONNECT_DISCONNECT, nil)
 			s.Lock()
 			delete(s.clients, conn.Identity())
@@ -147,18 +142,22 @@ type tcpClient struct {
 }
 
 func (c *tcpClient) connect(serverAddr string, callback IMessageCallback) bool {
+	c.conn.setState(STATE_CONNECTING)
 	addr, err := net.ResolveTCPAddr("tcp", serverAddr)
 	if err != nil {
 		bingo.E(err.Error())
+		c.conn.setState(STATE_CLOSED)
 		return false
 	}
 	conn, err := net.DialTCP("tcp", nil, addr)
 	if err != nil {
 		bingo.E(err.Error())
+		c.conn.setState(STATE_CLOSED)
 		return false
 	}
 	defer conn.Close()
 	c.conn = IConn(&tcpConn{conn: conn})
+	c.conn.setState(STATE_CONNECTED)
 	bingo.I("Tcp connect server ok :%s", serverAddr)
 	c.handleConnection(c.conn, callback)
 	return true
@@ -193,8 +192,10 @@ func (c *tcpClient) handleConnection(conn IConn, callback IMessageCallback) {
 func (c *tcpClient) Send(msgId MessageId, body MessageBody) bool {
 	c.Lock()
 	defer c.Unlock()
-	if c.conn != nil {
+	if c.conn != nil && c.conn.GetState() == STATE_CONNECTED {
 		return c.conn.Send(msgId, body)
+	} else {
+		bingo.W("-- send tcp message failed!!! conn wrong state --")
 	}
 	return false
 }

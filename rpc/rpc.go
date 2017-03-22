@@ -6,47 +6,8 @@ import (
 	"github.com/snippetor/bingo"
 	"sync"
 	"time"
-	"reflect"
-	"strings"
 	"math/rand"
 )
-
-type Args map[string]string
-
-type Context struct {
-	conn   net.IConn
-	method string
-	args   Args
-}
-
-var (
-	methods map[string]reflect.Value
-)
-
-// v：必须是指针
-func RegisterMethods(target string, v interface{}) {
-	if methods == nil {
-		methods = make(map[string]reflect.Value)
-	}
-	if reflect.TypeOf(v).Kind() != reflect.Ptr {
-		bingo.E("-- register methods failed! v must be a pointer. --")
-		return
-	}
-	t := reflect.TypeOf(v)
-	for i := 0; i < t.NumMethod(); i++ {
-		methods[makeKey(target, t.Method(i).Name)] = reflect.ValueOf(v).Method(i)
-	}
-}
-
-func callMethod(target, method string, ctx *Context) {
-	if v, ok := methods[makeKey(target, method)]; ok {
-		v.Call([]reflect.Value{reflect.ValueOf(ctx)})
-	}
-}
-
-func makeKey(target, method string) string {
-	return target + "." + method
-}
 
 type RPCEnd struct {
 	connId net.Identity
@@ -67,9 +28,9 @@ func (s *Server) Listen(port int) {
 	}
 }
 
-func (s *Server) Call(endName, methodName string, args Args) {
+func (s *Server) Call(endName, target, method string, args Args) {
 	if s.serv == nil {
-		bingo.E("-- call rpc method %s failed! rpc server no startup --", methodName)
+		bingo.E("-- call rpc method %s.%s failed! rpc server no startup --", target, method)
 		return
 	}
 	s.l.RLock()
@@ -85,15 +46,15 @@ func (s *Server) Call(endName, methodName string, args Args) {
 			i = rand.Intn(len(ends))
 		}
 		if conn, ok := s.serv.GetConnection(ends[i].connId); ok {
-			if body, ok := protocol.Marshal(&RPCMethodCall{MethodName:methodName, Args:args}); ok {
+			if body, ok := protocol.Marshal(&RPCMethodCall{Target: target, Method:method, Args:args}); ok {
 				if !conn.Send(net.MessageId(RPC_MSGID_CALL), body) {
-					bingo.E("-- call rpc method %s failed! send message failed --", methodName)
+					bingo.E("-- call rpc method %s.%s failed! send message failed --", target, method)
 				}
 			} else {
-				bingo.E("-- call rpc method %s failed! marshal message failed --", methodName)
+				bingo.E("-- call rpc method %s.%s failed! marshal message failed --", target, method)
 			}
 		} else {
-			bingo.E("-- call rpc method %s failed! no connection for call --", methodName)
+			bingo.E("-- call rpc method %s.%s failed! no connection for call --", target, method)
 		}
 	} else {
 		bingo.E("-- call rpc method failed! no end connected with name is %s --", endName)
@@ -137,55 +98,44 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 			bingo.E("-- RPC call failed! -- ")
 			return
 		}
-		bingo.D("@call method %s with args %s", call.MethodName, call.Args)
-		ctx := &Context{conn: conn, method: call.MethodName, args: call.Args}
-		strs := strings.Split(call.MethodName, ".")
-		if len(strs) >= 2 {
-			callMethod(strs[0], strs[1], ctx)
-		} else {
-			bingo.E("-- RPC call failed! MethodName is not in format {Target}.{Method} -- ")
-		}
+		bingo.D("@call method %s.%s with args %s", call.Target, call.Method, call.Args)
+		ctx := &Context{conn: conn, target: call.Target, method: call.Method, args: call.Args}
+		callMethod(call.Target, call.Method, ctx)
 	}
 }
-
-const (
-	STATE_CLOSED     = 0
-	STATE_CONNECTING = 1
-	STATE_CONNECTED  = 2
-)
 
 type Client struct {
 	conn  net.IConn
 	l     *sync.RWMutex
 	addr  string
-	state int
+	state net.ConnState
 }
 
 func (c *Client) Connect(serverAddress string) {
-	c.state = STATE_CONNECTING
+	c.state = net.STATE_CONNECTING
 	c.addr = serverAddress
 	c.l = &sync.RWMutex{}
 	if net.GoConnect(net.Tcp, serverAddress, c.handleMessage) == nil {
-		c.state = STATE_CLOSED
+		c.state = net.STATE_CLOSED
 		c.reconnect()
 	} else {
-		c.state = STATE_CONNECTED
+		c.state = net.STATE_CONNECTED
 	}
 }
 
-func (c *Client) Call(methodName string, args Args) {
+func (c *Client) Call(target, method string, args Args) {
 	if c.conn == nil {
-		bingo.E("-- call rpc method %s failed! rpc client not connect to server --", methodName)
+		bingo.E("-- call rpc method %s.%s failed! rpc client not connect to server --", target, method)
 		return
 	}
 	c.l.RLock()
 	defer c.l.RUnlock()
-	if body, ok := protocol.Marshal(&RPCMethodCall{MethodName:methodName, Args:args}); ok {
+	if body, ok := protocol.Marshal(&RPCMethodCall{Target: target, Method:method, Args:args}); ok {
 		if !c.conn.Send(net.MessageId(RPC_MSGID_CALL), body) {
-			bingo.E("-- call rpc method %s failed! send message failed --", methodName)
+			bingo.E("-- call rpc method %s.%s failed! send message failed --", target, method)
 		}
 	} else {
-		bingo.E("-- call rpc method %s failed! marshal message failed --", methodName)
+		bingo.E("-- call rpc method %s.%s failed! marshal message failed --", target, method)
 	}
 }
 
@@ -193,7 +143,7 @@ func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 	switch msgId {
 	case net.MSGID_CONNECT_DISCONNECT:
 		c.conn = nil
-		c.state = STATE_CLOSED
+		c.state = net.STATE_CLOSED
 		c.reconnect()
 	case RPC_MSGID_CALL:
 		call := &RPCMethodCall{}
@@ -201,25 +151,20 @@ func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 			bingo.E("-- RPC call failed! -- ")
 			return
 		}
-		bingo.D("@call method %s with args %s", call.MethodName, call.Args)
-		ctx := &Context{conn: conn, method: call.MethodName, args: call.Args}
-		strs := strings.Split(call.MethodName, ".")
-		if len(strs) >= 2 {
-			callMethod(strs[0], strs[1], ctx)
-		} else {
-			bingo.E("-- RPC call failed! MethodName is not in format {Target}.{Method} -- ")
-		}
+		bingo.D("@call method %s.%s with args %s", call.Target, call.Method, call.Args)
+		ctx := &Context{conn: conn, target:call.Target, method: call.Method, args: call.Args}
+		callMethod(call.Target, call.Method, ctx)
 	}
 }
 
 func (c *Client) reconnect() {
-	if STATE_CLOSED == c.state {
+	if net.STATE_CLOSED == c.state {
 		if net.GoConnect(net.Tcp, c.addr, c.handleMessage) == nil {
 			time.Sleep(1 * time.Second)
-			c.state = STATE_CLOSED
+			c.state = net.STATE_CLOSED
 			c.reconnect()
 		} else {
-			c.state = STATE_CONNECTED
+			c.state = net.STATE_CONNECTED
 		}
 	}
 }

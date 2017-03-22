@@ -5,14 +5,13 @@ import (
 	"github.com/gorilla/websocket"
 	"net/http"
 	"strconv"
-	"net"
 	"github.com/snippetor/bingo/comm"
 	"sync"
 )
 
 type wsConn struct {
-	conn     *websocket.Conn
-	identity Identity
+	conn *websocket.Conn
+	absConn
 }
 
 func (c *wsConn) Send(msgId MessageId, body MessageBody) bool {
@@ -20,7 +19,7 @@ func (c *wsConn) Send(msgId MessageId, body MessageBody) bool {
 		c.conn.WriteMessage(websocket.BinaryMessage, GetDefaultMessagePacker().Pack(msgId, body))
 		return true
 	} else {
-		bingo.E("-- send message failed!!! --")
+		bingo.W("-- send message failed!!! --")
 		return false
 	}
 }
@@ -54,13 +53,6 @@ func (c *wsConn) GetNetProtocol() NetProtocol {
 	return WebSocket
 }
 
-func (c *wsConn) Identity() Identity {
-	if !isValidIdentity(c.identity) {
-		c.identity = genIdentity()
-	}
-	return c.identity
-}
-
 type wsServer struct {
 	comm.Configable
 	sync.RWMutex
@@ -72,6 +64,7 @@ type wsServer struct {
 func (s *wsServer) wsHttpHandle(w http.ResponseWriter, r *http.Request) {
 	if conn, err := s.upgrader.Upgrade(w, r, nil); err == nil {
 		c := IConn(&wsConn{conn: conn})
+		c.setState(STATE_CONNECTED)
 		s.Lock()
 		s.clients[c.Identity()] = c
 		s.Unlock()
@@ -105,6 +98,7 @@ func (s *wsServer) handleConnection(conn IConn, callback IMessageCallback) {
 		_, err := conn.read(&buf)
 		if err != nil {
 			bingo.E(err.Error())
+			conn.setState(STATE_CLOSED)
 			callback(conn, MSGID_CONNECT_DISCONNECT, nil)
 			s.Lock()
 			delete(s.clients, conn.Identity())
@@ -137,13 +131,16 @@ type wsClient struct {
 }
 
 func (c *wsClient) connect(serverAddr string, callback IMessageCallback) bool {
+	c.conn.setState(STATE_CONNECTING)
 	conn, _, err := websocket.DefaultDialer.Dial(serverAddr, nil)
 	bingo.I("Ws connect server ok :%s", serverAddr)
 	if err != nil {
 		bingo.E(err.Error())
+		c.conn.setState(STATE_CLOSED)
 		return false
 	}
 	c.conn = IConn(&wsConn{conn:conn})
+	c.conn.setState(STATE_CONNECTED)
 	c.handleConnection(c.conn, callback)
 	return true
 }
@@ -170,8 +167,10 @@ func (c *wsClient) handleConnection(conn IConn, callback IMessageCallback) {
 func (c *wsClient) Send(msgId MessageId, body MessageBody) bool {
 	c.Lock()
 	defer c.Unlock()
-	if c.conn != nil {
+	if c.conn != nil && c.conn.GetState() == STATE_CONNECTED {
 		return c.conn.Send(msgId, body)
+	} else {
+		bingo.W("-- send tcp message failed!!! conn wrong state --")
 	}
 	return false
 }

@@ -2,6 +2,7 @@ package net
 
 import (
 	"sync"
+	"errors"
 )
 
 type MessageId int32
@@ -22,7 +23,8 @@ type IMessagePacker interface {
 	Unpack([]byte) (MessageId, MessageBody, []byte)
 }
 
-// 连接接口
+// ------------------------------------ 长连接 -------------------------------------//
+// 长连接接口
 type IConn interface {
 	Send(msgId MessageId, body MessageBody) bool
 	Close()
@@ -30,6 +32,8 @@ type IConn interface {
 	read(*[]byte) (int, error)
 	GetNetProtocol() NetProtocol
 	Identity() Identity
+	GetState() ConnState
+	setState(ConnState)
 }
 
 // 服务器接口
@@ -46,33 +50,45 @@ type IClient interface {
 	Close()
 }
 
-// ID生成
-type Identity int
+type ConnState int
 
 const (
-	MINMUM_IDENTIFY = 1000000
-	MAXMUM_IDENTIFY = 9999999
+	STATE_CLOSED     ConnState = iota
+	STATE_CONNECTING
+	STATE_CONNECTED
 )
 
-var (
-	_identify_ Identity = MINMUM_IDENTIFY
-	l          *sync.Mutex
-)
-
-func init() {
-	l = &sync.Mutex{}
+type absConn struct {
+	identity Identity
+	state    ConnState
 }
 
-func genIdentity() Identity {
-	l.Lock()
-	_identify_++
-	if _identify_ > MAXMUM_IDENTIFY {
-		_identify_ = MINMUM_IDENTIFY
+func (c *absConn) Send(msgId MessageId, body MessageBody) bool {
+	return false
+}
+func (c *absConn) Close() {
+}
+func (c *absConn) Address() string {
+	return "0.0.0.0"
+}
+func (c *absConn) read(*[]byte) (int, error) {
+	return -1, errors.New("-- not implements --")
+}
+func (c *absConn) GetNetProtocol() NetProtocol {
+	return -1
+}
+func (c *absConn) Identity() Identity {
+	if !isValidIdentity(c.identity) {
+		c.identity = genIdentity()
 	}
-	l.Unlock()
-	return _identify_
+	return c.identity
+}
+func (c *absConn) GetState() ConnState {
+	return c.state
 }
 
-func isValidIdentity(id Identity) bool {
-	return id <= MAXMUM_IDENTIFY && id >= MINMUM_IDENTIFY
+func (c *absConn) setState(state ConnState) {
+	c.state = state
 }
+
+// ------------------------------------ 短连接 -------------------------------------//

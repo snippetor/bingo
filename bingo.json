@@ -5,10 +5,14 @@
   "node": [
     {
       "name": "master",
+      "domain": 0
+    },
+    {
+      "name": "auth",
       "domain": 0,
       "service": [
         {
-          "type": "tcp",
+          "type": "http",
           "port": 9090,
           "proto": "protobuf"
         }
@@ -17,7 +21,7 @@
     {
       "name": "gate1",
       "domain": 0,
-      "net": [
+      "service": [
         {
           "type": "tcp",
           "port": 9090,

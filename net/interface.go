@@ -5,6 +5,8 @@ import (
 	"errors"
 )
 
+// ------------------------------------ 长连接 -------------------------------------//
+
 type MessageId int32
 type MessageBody []byte
 
@@ -13,7 +15,7 @@ const (
 )
 
 // 消息回调
-type IMessageCallback func(conn IConn, msgId MessageId, body MessageBody)
+type IMessageCallback func(conn ILongConn, msgId MessageId, body MessageBody)
 
 // 消息封装器接口
 type IMessagePacker interface {
@@ -23,71 +25,70 @@ type IMessagePacker interface {
 	Unpack([]byte) (MessageId, MessageBody, []byte)
 }
 
-// ------------------------------------ 长连接 -------------------------------------//
 // 长连接接口
-type IConn interface {
+type ILongConn interface {
 	Send(msgId MessageId, body MessageBody) bool
 	Close()
 	Address() string
 	read(*[]byte) (int, error)
-	GetNetProtocol() NetProtocol
+	GetNetProtocol() LCNetProtocol
 	Identity() Identity
-	GetState() ConnState
-	setState(ConnState)
+	GetState() LongConnState
+	setState(LongConnState)
 }
 
 // 服务器接口
-type IServer interface {
-	listen(int, IMessageCallback) bool
-	GetConnection(Identity) (IConn, bool)
+type ILCServer interface {
+	Listen(int, IMessageCallback) bool
+	GetConnection(Identity) (ILongConn, bool)
 	Close()
 }
 
 // 客户端接口
-type IClient interface {
-	connect(string, IMessageCallback) bool
+type ILCClient interface {
+	Connect(string, IMessageCallback) bool
 	Send(msgId MessageId, body MessageBody) bool
 	Close()
 }
 
-type ConnState int
+type LongConnState int
 
 const (
-	STATE_CLOSED     ConnState = iota
+	STATE_CLOSED     LongConnState = iota
 	STATE_CONNECTING
 	STATE_CONNECTED
 )
 
-type absConn struct {
+type absLongConn struct {
 	identity Identity
-	state    ConnState
+	state    LongConnState
 }
 
-func (c *absConn) Send(msgId MessageId, body MessageBody) bool {
+func (c *absLongConn) Send(msgId MessageId, body MessageBody) bool {
 	return false
 }
-func (c *absConn) Close() {
+func (c *absLongConn) Close() {
 }
-func (c *absConn) Address() string {
+func (c *absLongConn) Address() string {
 	return "0.0.0.0"
 }
-func (c *absConn) read(*[]byte) (int, error) {
+func (c *absLongConn) read(*[]byte) (int, error) {
 	return -1, errors.New("-- not implements --")
 }
-func (c *absConn) GetNetProtocol() NetProtocol {
+func (c *absLongConn) GetNetProtocol() LCNetProtocol {
 	return -1
 }
-func (c *absConn) Identity() Identity {
+func (c *absLongConn) Identity() Identity {
 	if !isValidIdentity(c.identity) {
 		c.identity = genIdentity()
 	}
 	return c.identity
 }
-func (c *absConn) GetState() ConnState {
+func (c *absLongConn) GetState() LongConnState {
 	return c.state
 }
 
-func (c *absConn) setState(state ConnState) {
+func (c *absLongConn) setState(state LongConnState) {
 	c.state = state
 }
 

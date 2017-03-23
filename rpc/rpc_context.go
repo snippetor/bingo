@@ -9,7 +9,7 @@ import (
 type Args map[string]string
 
 type Context struct {
-	conn   net.IConn
+	conn   net.ILongConn
 	target string
 	method string
 	args   Args

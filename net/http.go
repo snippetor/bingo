@@ -4,7 +4,7 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func main() {
+func List() {
 	c := fasthttp.Client{}
 	c.Do()
 }

@@ -15,7 +15,7 @@ type RPCEnd struct {
 }
 
 type Server struct {
-	serv net.IServer
+	serv net.ILCServer
 	end  map[string][]*RPCEnd
 	l    *sync.RWMutex
 }
@@ -61,7 +61,7 @@ func (s *Server) Call(endName, target, method string, args Args) {
 	}
 }
 
-func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
+func (s *Server) handleMessage(conn net.ILongConn, msgId net.MessageId, body net.MessageBody) {
 	switch msgId {
 	case net.MSGID_CONNECT_DISCONNECT:
 		for name, arr := range s.end {
@@ -105,10 +105,10 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 }
 
 type Client struct {
-	conn  net.IConn
+	conn  net.ILongConn
 	l     *sync.RWMutex
 	addr  string
-	state net.ConnState
+	state net.LongConnState
 }
 
 func (c *Client) Connect(serverAddress string) {
@@ -139,7 +139,7 @@ func (c *Client) Call(target, method string, args Args) {
 	}
 }
 
-func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
+func (c *Client) handleMessage(conn net.ILongConn, msgId net.MessageId, body net.MessageBody) {
 	switch msgId {
 	case net.MSGID_CONNECT_DISCONNECT:
 		c.conn = nil

@@ -93,3 +93,7 @@ func (c *absLongConn) setState(state LongConnState) {
 }
 
 // ------------------------------------ 短连接 -------------------------------------//
+// 服务器接口
+type ISCServer interface {
+	Listen(int, IMessageCallback) bool
+}

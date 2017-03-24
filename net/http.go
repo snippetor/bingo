@@ -2,9 +2,18 @@ package net
 
 import (
 	"github.com/valyala/fasthttp"
+	"strconv"
 )
 
-func List() {
-	c := fasthttp.Client{}
-	c.Do()
+type httpContext struct {
+}
+
+type httpServer struct {
+}
+
+func (s *httpServer) Listen(port int) {
+	f := func(ctx *fasthttp.RequestCtx) {
+
+	}
+	fasthttp.ListenAndServe(":"+strconv.Itoa(port), f)
 }

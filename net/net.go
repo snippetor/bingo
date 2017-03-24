@@ -57,3 +57,16 @@ func NewLCClient(net LCNetProtocol) (ILCClient, bool) {
 	}
 	return client, true
 }
+
+// 创建短连接服务器
+func NewSCServer(net SCNetProtocol) (ISCServer, bool) {
+	var server ISCServer
+	switch net {
+	case Http:
+		server = ISCServer(&httpServer{})
+	default:
+		bingo.E("-- error net type '%d', must be 'http' or other --", net)
+		return nil, false
+	}
+	return server, true
+}

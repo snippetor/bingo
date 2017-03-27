@@ -3,6 +3,8 @@ package rpc;
 enum RPC_MSGID {
     HANDSHAKE = -0x100;
     CALL = -0x200;
+    CALL_NORETURN = -0x201;
+    RETURN = -0x202;
 }
 
 message RPCHandShake {
@@ -10,7 +12,19 @@ message RPCHandShake {
 }
 
 message RPCMethodCall {
-    required string target = 1;
+    required int32 call_seq = 1;
     required string method = 2;
     map<string, string> args = 3;
+}
+
+message RPCMethodCallNoReturn {
+    required int32 call_seq = 1;
+    required string method = 2;
+    map<string, string> args = 3;
+}
+
+message RPCMethodReturn {
+    required int32 call_seq = 1;
+    required string method = 2;
+    map<string, string> returns = 3;
 }

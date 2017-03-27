@@ -11,7 +11,7 @@
 	It has these top-level messages:
 		Person
 */
-package protocol
+package codec
 
 import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"

@@ -12,61 +12,79 @@ func init() {
 	globalPacker = IMessagePacker(&DefaultMessagePacker{})
 }
 
+func SetDefaultMessagePacker(packer IMessagePacker) {
+	globalPacker = packer
+}
+
 func GetDefaultMessagePacker() IMessagePacker {
 	return globalPacker
 }
 
-type LCNetProtocol byte
-type SCNetProtocol byte
+type NetProtocol int
 
 const (
-	Tcp       LCNetProtocol = iota
+	Tcp       NetProtocol = iota
 	WebSocket
 )
 
-const (
-	Http SCNetProtocol = iota
-)
-
-// 创建长连接服务器
-func NewLCServer(net LCNetProtocol) (ILCServer, bool) {
-	var server ILCServer
+// 同步执行网络监听
+func Listen(net NetProtocol, port int, callback IMessageCallback) (IServer, bool) {
+	var server IServer
 	switch net {
 	case Tcp:
-		server = ILCServer(&tcpServer{})
+		server = IServer(&tcpServer{})
 	case WebSocket:
-		server = ILCServer(&wsServer{})
+		server = IServer(&wsServer{})
 	default:
 		bingo.E("-- error net type '%d', must be 'ws' or 'tcp' --", net)
 		return nil, false
 	}
-	return server, true
+	return server, server.listen(port, callback)
 }
 
-// 创建长连接客户端
-func NewLCClient(net LCNetProtocol) (ILCClient, bool) {
-	var client ILCClient
+// 异步执行网络监听
+func GoListen(net NetProtocol, port int, callback IMessageCallback) IServer {
+	var server IServer
 	switch net {
 	case Tcp:
-		client = ILCClient(&tcpClient{})
+		server = IServer(&tcpServer{})
 	case WebSocket:
-		client = ILCClient(&wsClient{})
+		server = IServer(&wsServer{})
+	default:
+		bingo.E("-- error net type '%d', must be 'ws' or 'tcp' --", net)
+		return nil
+	}
+	go server.listen(port, callback)
+	return server
+}
+
+// 同步连接服务器
+func Connect(net NetProtocol, serverAddr string, callback IMessageCallback) (IClient, bool) {
+	var client IClient
+	switch net {
+	case Tcp:
+		client = IClient(&tcpClient{})
+	case WebSocket:
+		client = IClient(&wsClient{})
 	default:
 		bingo.E("-- error net type '%d', must be 'ws' or 'tcp' --", net)
 		return nil, false
 	}
-	return client, true
+	return client, client.connect(serverAddr, callback)
 }
 
-// 创建短连接服务器
-func NewSCServer(net SCNetProtocol) (ISCServer, bool) {
-	var server ISCServer
+// 异步连接服务器
+func GoConnect(net NetProtocol, serverAddr string, callback IMessageCallback) IClient {
+	var client IClient
 	switch net {
-	case Http:
-		server = ISCServer(&httpServer{})
+	case Tcp:
+		client = IClient(&tcpClient{})
+	case WebSocket:
+		client = IClient(&wsClient{})
 	default:
-		bingo.E("-- error net type '%d', must be 'http' or other --", net)
-		return nil, false
+		bingo.E("-- error net type '%d', must be 'ws' or 'tcp' --", net)
+		return nil
 	}
-	return server, true
+	go client.connect(serverAddr, callback)
+	return client
 }

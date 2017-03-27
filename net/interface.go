@@ -1,11 +1,8 @@
 package net
 
 import (
-	"sync"
 	"errors"
 )
-
-// ------------------------------------ 长连接 -------------------------------------//
 
 type MessageId int32
 type MessageBody []byte
@@ -15,7 +12,7 @@ const (
 )
 
 // 消息回调
-type IMessageCallback func(conn ILongConn, msgId MessageId, body MessageBody)
+type IMessageCallback func(conn IConn, msgId MessageId, body MessageBody)
 
 // 消息封装器接口
 type IMessagePacker interface {
@@ -26,74 +23,68 @@ type IMessagePacker interface {
 }
 
 // 长连接接口
-type ILongConn interface {
+type IConn interface {
 	Send(msgId MessageId, body MessageBody) bool
 	Close()
 	Address() string
 	read(*[]byte) (int, error)
-	GetNetProtocol() LCNetProtocol
+	GetNetProtocol() NetProtocol
 	Identity() Identity
-	GetState() LongConnState
-	setState(LongConnState)
+	GetState() ConnState
+	setState(ConnState)
 }
 
 // 服务器接口
-type ILCServer interface {
-	Listen(int, IMessageCallback) bool
-	GetConnection(Identity) (ILongConn, bool)
+type IServer interface {
+	listen(int, IMessageCallback) bool
+	GetConnection(Identity) (IConn, bool)
 	Close()
 }
 
 // 客户端接口
-type ILCClient interface {
-	Connect(string, IMessageCallback) bool
+type IClient interface {
+	connect(string, IMessageCallback) bool
 	Send(msgId MessageId, body MessageBody) bool
 	Close()
 }
 
-type LongConnState int
+type ConnState int
 
 const (
-	STATE_CLOSED     LongConnState = iota
+	STATE_CLOSED     ConnState = iota
 	STATE_CONNECTING
 	STATE_CONNECTED
 )
 
-type absLongConn struct {
+type absConn struct {
 	identity Identity
-	state    LongConnState
+	state    ConnState
 }
 
-func (c *absLongConn) Send(msgId MessageId, body MessageBody) bool {
+func (c *absConn) Send(msgId MessageId, body MessageBody) bool {
 	return false
 }
-func (c *absLongConn) Close() {
+func (c *absConn) Close() {
 }
-func (c *absLongConn) Address() string {
+func (c *absConn) Address() string {
 	return "0.0.0.0"
 }
-func (c *absLongConn) read(*[]byte) (int, error) {
+func (c *absConn) read(*[]byte) (int, error) {
 	return -1, errors.New("-- not implements --")
 }
-func (c *absLongConn) GetNetProtocol() LCNetProtocol {
+func (c *absConn) GetNetProtocol() NetProtocol {
 	return -1
 }
-func (c *absLongConn) Identity() Identity {
+func (c *absConn) Identity() Identity {
 	if !isValidIdentity(c.identity) {
 		c.identity = genIdentity()
 	}
 	return c.identity
 }
-func (c *absLongConn) GetState() LongConnState {
+func (c *absConn) GetState() ConnState {
 	return c.state
 }
 
-func (c *absLongConn) setState(state LongConnState) {
+func (c *absConn) setState(state ConnState) {
 	c.state = state
-}
-
-// ------------------------------------ 短连接 -------------------------------------//
-// 服务器接口
-type ISCServer interface {
-	Listen(int, IMessageCallback) bool
 }

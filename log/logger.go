@@ -55,15 +55,15 @@ const (
 )
 
 var DEFAULT_CONFIG = &Config{
-	Level:                      Info,
-	OutputType:                 Console | File,
-	LogFileRollingType:         RollingDaily,
-	LogFileOutputDir:           ".",
-	LogFileName:                "bingo",
-	LogFileNameDatePattern:     "20060102",
-	LogFileNameExt:             ".log",
-	LogFileMaxSize:             500 * MB,
-	LogFileScanInterval:        1 * time.Second,
+	Level:                  Info,
+	OutputType:             Console | File,
+	LogFileRollingType:     RollingDaily,
+	LogFileOutputDir:       ".",
+	LogFileName:            "bingo",
+	LogFileNameDatePattern: "20060102",
+	LogFileNameExt:         ".log",
+	LogFileMaxSize:         500 * MB,
+	LogFileScanInterval:    1 * time.Second,
 }
 
 type Logger struct {
@@ -137,9 +137,9 @@ func (l *Logger) setConfigFile(configFile string) {
 	if err == nil {
 		c.LogFileMaxSize = i
 	} else {
-		i, err = strconv.ParseInt(size[:len(size) - 2], 10, 64)
+		i, err = strconv.ParseInt(size[:len(size)-2], 10, 64)
 		if err == nil {
-			unit := strings.ToUpper(size[len(size) - 2:])
+			unit := strings.ToUpper(size[len(size)-2:])
 			if unit == "KB" {
 				c.LogFileMaxSize = i * KB
 			} else if unit == "MB" {
@@ -157,7 +157,7 @@ func (l *Logger) setConfigFile(configFile string) {
 
 func (l *Logger) setConfig(c *Config) {
 	l.config = c
-	l.makeFile()
+	//l.makeFile()
 	l.startFileCheckMonitor()
 }
 
@@ -265,7 +265,7 @@ func (l *Logger) checkFile() {
 		dateString := time.Now().Format(l.config.LogFileNameDatePattern)
 		t, _ := time.Parse(l.config.LogFileNameDatePattern, dateString)
 		if len(l.f.Name()) >= len(l.config.LogFileName)+len(l.config.LogFileNameExt)+len(l.config.LogFileNameDatePattern)+1 {
-			d, err := time.Parse(l.config.LogFileNameDatePattern, l.f.Name()[len(l.config.LogFileName) + 1:len(l.config.LogFileName) + len(l.config.LogFileNameDatePattern) + 1])
+			d, err := time.Parse(l.config.LogFileNameDatePattern, l.f.Name()[len(l.config.LogFileName)+1:len(l.config.LogFileName)+len(l.config.LogFileNameDatePattern)+1])
 			if err != nil {
 				log.Println("============== parse date failed!!! ===============")
 			}
@@ -326,7 +326,7 @@ func (l *Logger) genFileSeq() string {
 		if err == nil {
 			seq, err := strconv.Atoi(string(bytes))
 			if err == nil {
-				ioutil.WriteFile(seqFile, []byte(strconv.Itoa(seq + 1)), 0666)
+				ioutil.WriteFile(seqFile, []byte(strconv.Itoa(seq+1)), 0666)
 				return strconv.Itoa(seq + 1)
 			}
 		}

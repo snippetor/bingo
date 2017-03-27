@@ -11,7 +11,7 @@ import (
 
 type wsConn struct {
 	conn *websocket.Conn
-	absLongConn
+	absConn
 }
 
 func (c *wsConn) Send(msgId MessageId, body MessageBody) bool {
@@ -49,7 +49,7 @@ func (c *wsConn) Address() string {
 	return "0:0:0:0"
 }
 
-func (c *wsConn) GetNetProtocol() LCNetProtocol {
+func (c *wsConn) GetNetProtocol() NetProtocol {
 	return WebSocket
 }
 
@@ -58,12 +58,12 @@ type wsServer struct {
 	sync.RWMutex
 	upgrader *websocket.Upgrader
 	callback IMessageCallback
-	clients  map[Identity]ILongConn
+	clients  map[Identity]IConn
 }
 
 func (s *wsServer) wsHttpHandle(w http.ResponseWriter, r *http.Request) {
 	if conn, err := s.upgrader.Upgrade(w, r, nil); err == nil {
-		c := ILongConn(&wsConn{conn: conn})
+		c := IConn(&wsConn{conn: conn})
 		c.setState(STATE_CONNECTED)
 		s.Lock()
 		s.clients[c.Identity()] = c
@@ -74,12 +74,12 @@ func (s *wsServer) wsHttpHandle(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *wsServer) Listen(port int, callback IMessageCallback) bool {
+func (s *wsServer) listen(port int, callback IMessageCallback) bool {
 	if s.upgrader == nil {
 		s.upgrader = &websocket.Upgrader{}
 	}
 	s.callback = callback
-	s.clients = make(map[Identity]ILongConn, 0)
+	s.clients = make(map[Identity]IConn, 0)
 	http.HandleFunc("/", s.wsHttpHandle)
 	if err := http.ListenAndServe("localhost:"+strconv.Itoa(port), nil); err != nil {
 		bingo.E(err.Error())
@@ -91,7 +91,7 @@ func (s *wsServer) Listen(port int, callback IMessageCallback) bool {
 func (s *wsServer) Close() {
 }
 
-func (s *wsServer) handleConnection(conn ILongConn, callback IMessageCallback) {
+func (s *wsServer) handleConnection(conn IConn, callback IMessageCallback) {
 	var buf []byte
 	defer conn.Close()
 	for {
@@ -113,7 +113,7 @@ func (s *wsServer) handleConnection(conn ILongConn, callback IMessageCallback) {
 	}
 }
 
-func (s *wsServer) GetConnection(identity Identity) (ILongConn, bool) {
+func (s *wsServer) GetConnection(identity Identity) (IConn, bool) {
 	s.RLock()
 	defer s.RUnlock()
 	if s.clients == nil {
@@ -127,10 +127,10 @@ func (s *wsServer) GetConnection(identity Identity) (ILongConn, bool) {
 type wsClient struct {
 	comm.Configable
 	sync.Mutex
-	conn ILongConn
+	conn IConn
 }
 
-func (c *wsClient) Connect(serverAddr string, callback IMessageCallback) bool {
+func (c *wsClient) connect(serverAddr string, callback IMessageCallback) bool {
 	c.conn.setState(STATE_CONNECTING)
 	conn, _, err := websocket.DefaultDialer.Dial(serverAddr, nil)
 	bingo.I("Ws connect server ok :%s", serverAddr)
@@ -139,13 +139,13 @@ func (c *wsClient) Connect(serverAddr string, callback IMessageCallback) bool {
 		c.conn.setState(STATE_CLOSED)
 		return false
 	}
-	c.conn = ILongConn(&wsConn{conn:conn})
+	c.conn = IConn(&wsConn{conn: conn})
 	c.conn.setState(STATE_CONNECTED)
 	c.handleConnection(c.conn, callback)
 	return true
 }
 
-func (c *wsClient) handleConnection(conn ILongConn, callback IMessageCallback) {
+func (c *wsClient) handleConnection(conn IConn, callback IMessageCallback) {
 	var buf []byte
 	defer conn.Close()
 	for {

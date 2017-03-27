@@ -10,7 +10,7 @@ import (
 
 type tcpConn struct {
 	conn *net.TCPConn
-	absLongConn
+	absConn
 }
 
 func (c *tcpConn) Send(msgId MessageId, body MessageBody) bool {
@@ -44,7 +44,7 @@ func (c *tcpConn) Address() string {
 	return "0:0:0:0"
 }
 
-func (c *tcpConn) GetNetProtocol() LCNetProtocol {
+func (c *tcpConn) GetNetProtocol() NetProtocol {
 	return Tcp
 }
 
@@ -52,10 +52,10 @@ type tcpServer struct {
 	comm.Configable
 	sync.RWMutex
 	listener *net.TCPListener
-	clients  map[Identity]ILongConn
+	clients  map[Identity]IConn
 }
 
-func (s *tcpServer) Listen(port int, callback IMessageCallback) bool {
+func (s *tcpServer) listen(port int, callback IMessageCallback) bool {
 	addr, err := net.ResolveTCPAddr("tcp", ":"+strconv.Itoa(port))
 	if err != nil {
 		bingo.E(err.Error())
@@ -68,7 +68,7 @@ func (s *tcpServer) Listen(port int, callback IMessageCallback) bool {
 	}
 	defer listener.Close()
 	s.listener = listener
-	s.clients = make(map[Identity]ILongConn, 0)
+	s.clients = make(map[Identity]IConn, 0)
 	bingo.I("Tcp server runnning on :%d", port)
 	for {
 		conn, err := listener.AcceptTCP()
@@ -76,7 +76,7 @@ func (s *tcpServer) Listen(port int, callback IMessageCallback) bool {
 			continue
 		}
 		bingo.I(conn.RemoteAddr().String(), " tcp connect success")
-		c := ILongConn(&tcpConn{conn: conn})
+		c := IConn(&tcpConn{conn: conn})
 		c.setState(STATE_CONNECTED)
 		s.Lock()
 		s.clients[c.Identity()] = c
@@ -87,7 +87,7 @@ func (s *tcpServer) Listen(port int, callback IMessageCallback) bool {
 }
 
 // 处理消息流
-func (s *tcpServer) handleConnection(conn ILongConn, callback IMessageCallback) {
+func (s *tcpServer) handleConnection(conn IConn, callback IMessageCallback) {
 	buf := make([]byte, 4096) // 4KB
 	byteBuffer := make([]byte, 0)
 	defer conn.Close()
@@ -115,7 +115,7 @@ func (s *tcpServer) handleConnection(conn ILongConn, callback IMessageCallback) 
 	}
 }
 
-func (s *tcpServer) GetConnection(identity Identity) (ILongConn, bool) {
+func (s *tcpServer) GetConnection(identity Identity) (IConn, bool) {
 	s.RLock()
 	defer s.RUnlock()
 	if s.clients == nil {
@@ -138,10 +138,10 @@ func (s *tcpServer) Close() {
 type tcpClient struct {
 	comm.Configable
 	sync.Mutex
-	conn ILongConn
+	conn IConn
 }
 
-func (c *tcpClient) Connect(serverAddr string, callback IMessageCallback) bool {
+func (c *tcpClient) connect(serverAddr string, callback IMessageCallback) bool {
 	c.conn.setState(STATE_CONNECTING)
 	addr, err := net.ResolveTCPAddr("tcp", serverAddr)
 	if err != nil {
@@ -156,7 +156,7 @@ func (c *tcpClient) Connect(serverAddr string, callback IMessageCallback) bool {
 		return false
 	}
 	defer conn.Close()
-	c.conn = ILongConn(&tcpConn{conn: conn})
+	c.conn = IConn(&tcpConn{conn: conn})
 	c.conn.setState(STATE_CONNECTED)
 	bingo.I("Tcp connect server ok :%s", serverAddr)
 	c.handleConnection(c.conn, callback)
@@ -164,7 +164,7 @@ func (c *tcpClient) Connect(serverAddr string, callback IMessageCallback) bool {
 }
 
 // 处理消息流
-func (c *tcpClient) handleConnection(conn ILongConn, callback IMessageCallback) {
+func (c *tcpClient) handleConnection(conn IConn, callback IMessageCallback) {
 	buf := make([]byte, 4096) // 4KB
 	byteBuffer := make([]byte, 0)
 	defer conn.Close()

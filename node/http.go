@@ -1,4 +1,4 @@
-package net
+package node
 
 import (
 	"github.com/valyala/fasthttp"
@@ -13,7 +13,6 @@ type httpServer struct {
 
 func (s *httpServer) Listen(port int) {
 	f := func(ctx *fasthttp.RequestCtx) {
-
 	}
 	fasthttp.ListenAndServe(":"+strconv.Itoa(port), f)
 }

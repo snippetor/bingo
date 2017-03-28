@@ -13,8 +13,7 @@
       "service": [
         {
           "type": "http",
-          "port": 9090,
-          "proto": "protobuf"
+          "port": 8080
         }
       ]
     },
@@ -25,13 +24,20 @@
         {
           "type": "tcp",
           "port": 9090,
-          "proto": "protobuf"
+          "codec": "protobuf"
         }
+      ],
+      "rpc-to": [
+        "master"
       ]
     },
     {
       "name": "game1",
-      "domain": 0
+      "domain": 0,
+      "rpc-to": [
+        "master",
+        "gate1"
+      ]
     }
   ]
 }

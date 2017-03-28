@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"github.com/snippetor/bingo/comm"
 	"sync"
+	"github.com/snippetor/bingo/utils"
 )
 
 type tcpConn struct {
@@ -52,7 +53,7 @@ type tcpServer struct {
 	comm.Configable
 	sync.RWMutex
 	listener *net.TCPListener
-	clients  map[Identity]IConn
+	clients  map[utils.Identity]IConn
 }
 
 func (s *tcpServer) listen(port int, callback IMessageCallback) bool {
@@ -68,7 +69,7 @@ func (s *tcpServer) listen(port int, callback IMessageCallback) bool {
 	}
 	defer listener.Close()
 	s.listener = listener
-	s.clients = make(map[Identity]IConn, 0)
+	s.clients = make(map[utils.Identity]IConn, 0)
 	bingo.I("Tcp server runnning on :%d", port)
 	for {
 		conn, err := listener.AcceptTCP()
@@ -115,7 +116,7 @@ func (s *tcpServer) handleConnection(conn IConn, callback IMessageCallback) {
 	}
 }
 
-func (s *tcpServer) GetConnection(identity Identity) (IConn, bool) {
+func (s *tcpServer) GetConnection(identity utils.Identity) (IConn, bool) {
 	s.RLock()
 	defer s.RUnlock()
 	if s.clients == nil {
@@ -172,6 +173,7 @@ func (c *tcpClient) handleConnection(conn IConn, callback IMessageCallback) {
 		l, err := conn.read(&buf)
 		if err != nil {
 			bingo.E(err.Error())
+			c.conn.setState(STATE_CLOSED)
 			callback(conn, MSGID_CONNECT_DISCONNECT, nil)
 			c.conn = nil
 			break

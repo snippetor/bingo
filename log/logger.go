@@ -257,7 +257,7 @@ func (l *Logger) makeFile() {
 
 // 检查文件是否需要重新创建
 func (l *Logger) checkFile() {
-	if l.config.OutputType == Console {
+	if l.config.OutputType == Console || l.f == nil {
 		return
 	}
 	needRecreate, newFileName := false, l.config.LogFileName

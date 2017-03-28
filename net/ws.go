@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"github.com/snippetor/bingo/comm"
 	"sync"
+	"github.com/snippetor/bingo/utils"
 )
 
 type wsConn struct {
@@ -58,7 +59,7 @@ type wsServer struct {
 	sync.RWMutex
 	upgrader *websocket.Upgrader
 	callback IMessageCallback
-	clients  map[Identity]IConn
+	clients  map[utils.Identity]IConn
 }
 
 func (s *wsServer) wsHttpHandle(w http.ResponseWriter, r *http.Request) {
@@ -79,7 +80,7 @@ func (s *wsServer) listen(port int, callback IMessageCallback) bool {
 		s.upgrader = &websocket.Upgrader{}
 	}
 	s.callback = callback
-	s.clients = make(map[Identity]IConn, 0)
+	s.clients = make(map[utils.Identity]IConn, 0)
 	http.HandleFunc("/", s.wsHttpHandle)
 	if err := http.ListenAndServe("localhost:"+strconv.Itoa(port), nil); err != nil {
 		bingo.E(err.Error())
@@ -113,7 +114,7 @@ func (s *wsServer) handleConnection(conn IConn, callback IMessageCallback) {
 	}
 }
 
-func (s *wsServer) GetConnection(identity Identity) (IConn, bool) {
+func (s *wsServer) GetConnection(identity utils.Identity) (IConn, bool) {
 	s.RLock()
 	defer s.RUnlock()
 	if s.clients == nil {
@@ -152,6 +153,7 @@ func (c *wsClient) handleConnection(conn IConn, callback IMessageCallback) {
 		_, err := conn.read(&buf)
 		if err != nil {
 			bingo.E(err.Error())
+			c.conn.setState(STATE_CLOSED)
 			callback(conn, MSGID_CONNECT_DISCONNECT, nil)
 			c.conn = nil
 			break

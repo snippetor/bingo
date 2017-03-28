@@ -2,6 +2,7 @@ package net
 
 import (
 	"errors"
+	"github.com/snippetor/bingo/utils"
 )
 
 type MessageId int32
@@ -29,7 +30,7 @@ type IConn interface {
 	Address() string
 	read(*[]byte) (int, error)
 	GetNetProtocol() NetProtocol
-	Identity() Identity
+	Identity() utils.Identity
 	GetState() ConnState
 	setState(ConnState)
 }
@@ -37,7 +38,7 @@ type IConn interface {
 // 服务器接口
 type IServer interface {
 	listen(int, IMessageCallback) bool
-	GetConnection(Identity) (IConn, bool)
+	GetConnection(utils.Identity) (IConn, bool)
 	Close()
 }
 
@@ -56,8 +57,16 @@ const (
 	STATE_CONNECTED
 )
 
+var (
+	identifier *utils.Identifier
+)
+
+func init() {
+	identifier = utils.NewIdentifier(1)
+}
+
 type absConn struct {
-	identity Identity
+	identity utils.Identity
 	state    ConnState
 }
 
@@ -75,9 +84,9 @@ func (c *absConn) read(*[]byte) (int, error) {
 func (c *absConn) GetNetProtocol() NetProtocol {
 	return -1
 }
-func (c *absConn) Identity() Identity {
-	if !isValidIdentity(c.identity) {
-		c.identity = genIdentity()
+func (c *absConn) Identity() utils.Identity {
+	if !identifier.IsValidIdentity(c.identity) {
+		c.identity = identifier.GenIdentity()
 	}
 	return c.identity
 }

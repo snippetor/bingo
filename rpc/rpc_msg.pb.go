@@ -11,7 +11,6 @@
 	It has these top-level messages:
 		RPCHandShake
 		RPCMethodCall
-		RPCMethodCallNoReturn
 		RPCMethodReturn
 */
 package rpc
@@ -122,38 +121,6 @@ func (m *RPCMethodCall) GetArgs() map[string]string {
 	return nil
 }
 
-type RPCMethodCallNoReturn struct {
-	CallSeq int32             `protobuf:"varint,1,req,name=call_seq,json=callSeq" json:"call_seq"`
-	Method  string            `protobuf:"bytes,2,req,name=method" json:"method"`
-	Args    map[string]string `protobuf:"bytes,3,rep,name=args" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-}
-
-func (m *RPCMethodCallNoReturn) Reset()                    { *m = RPCMethodCallNoReturn{} }
-func (m *RPCMethodCallNoReturn) String() string            { return proto.CompactTextString(m) }
-func (*RPCMethodCallNoReturn) ProtoMessage()               {}
-func (*RPCMethodCallNoReturn) Descriptor() ([]byte, []int) { return fileDescriptorRpcMsg, []int{2} }
-
-func (m *RPCMethodCallNoReturn) GetCallSeq() int32 {
-	if m != nil {
-		return m.CallSeq
-	}
-	return 0
-}
-
-func (m *RPCMethodCallNoReturn) GetMethod() string {
-	if m != nil {
-		return m.Method
-	}
-	return ""
-}
-
-func (m *RPCMethodCallNoReturn) GetArgs() map[string]string {
-	if m != nil {
-		return m.Args
-	}
-	return nil
-}
-
 type RPCMethodReturn struct {
 	CallSeq int32             `protobuf:"varint,1,req,name=call_seq,json=callSeq" json:"call_seq"`
 	Method  string            `protobuf:"bytes,2,req,name=method" json:"method"`
@@ -163,7 +130,7 @@ type RPCMethodReturn struct {
 func (m *RPCMethodReturn) Reset()                    { *m = RPCMethodReturn{} }
 func (m *RPCMethodReturn) String() string            { return proto.CompactTextString(m) }
 func (*RPCMethodReturn) ProtoMessage()               {}
-func (*RPCMethodReturn) Descriptor() ([]byte, []int) { return fileDescriptorRpcMsg, []int{3} }
+func (*RPCMethodReturn) Descriptor() ([]byte, []int) { return fileDescriptorRpcMsg, []int{2} }
 
 func (m *RPCMethodReturn) GetCallSeq() int32 {
 	if m != nil {
@@ -189,7 +156,6 @@ func (m *RPCMethodReturn) GetReturns() map[string]string {
 func init() {
 	proto.RegisterType((*RPCHandShake)(nil), "rpc.RPCHandShake")
 	proto.RegisterType((*RPCMethodCall)(nil), "rpc.RPCMethodCall")
-	proto.RegisterType((*RPCMethodCallNoReturn)(nil), "rpc.RPCMethodCallNoReturn")
 	proto.RegisterType((*RPCMethodReturn)(nil), "rpc.RPCMethodReturn")
 	proto.RegisterEnum("rpc.RPC_MSGID", RPC_MSGID_name, RPC_MSGID_value)
 }
@@ -226,48 +192,6 @@ func (m *RPCMethodCall) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *RPCMethodCall) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	dAtA[i] = 0x8
-	i++
-	i = encodeVarintRpcMsg(dAtA, i, uint64(m.CallSeq))
-	dAtA[i] = 0x12
-	i++
-	i = encodeVarintRpcMsg(dAtA, i, uint64(len(m.Method)))
-	i += copy(dAtA[i:], m.Method)
-	if len(m.Args) > 0 {
-		for k, _ := range m.Args {
-			dAtA[i] = 0x1a
-			i++
-			v := m.Args[k]
-			mapSize := 1 + len(k) + sovRpcMsg(uint64(len(k))) + 1 + len(v) + sovRpcMsg(uint64(len(v)))
-			i = encodeVarintRpcMsg(dAtA, i, uint64(mapSize))
-			dAtA[i] = 0xa
-			i++
-			i = encodeVarintRpcMsg(dAtA, i, uint64(len(k)))
-			i += copy(dAtA[i:], k)
-			dAtA[i] = 0x12
-			i++
-			i = encodeVarintRpcMsg(dAtA, i, uint64(len(v)))
-			i += copy(dAtA[i:], v)
-		}
-	}
-	return i, nil
-}
-
-func (m *RPCMethodCallNoReturn) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *RPCMethodCallNoReturn) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -377,23 +301,6 @@ func (m *RPCHandShake) Size() (n int) {
 }
 
 func (m *RPCMethodCall) Size() (n int) {
-	var l int
-	_ = l
-	n += 1 + sovRpcMsg(uint64(m.CallSeq))
-	l = len(m.Method)
-	n += 1 + l + sovRpcMsg(uint64(l))
-	if len(m.Args) > 0 {
-		for k, v := range m.Args {
-			_ = k
-			_ = v
-			mapEntrySize := 1 + len(k) + sovRpcMsg(uint64(len(k))) + 1 + len(v) + sovRpcMsg(uint64(len(v)))
-			n += mapEntrySize + 1 + sovRpcMsg(uint64(mapEntrySize))
-		}
-	}
-	return n
-}
-
-func (m *RPCMethodCallNoReturn) Size() (n int) {
 	var l int
 	_ = l
 	n += 1 + sovRpcMsg(uint64(m.CallSeq))
@@ -552,229 +459,6 @@ func (m *RPCMethodCall) Unmarshal(dAtA []byte) error {
 		}
 		if fieldNum <= 0 {
 			return fmt.Errorf("proto: RPCMethodCall: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field CallSeq", wireType)
-			}
-			m.CallSeq = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowRpcMsg
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.CallSeq |= (int32(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			hasFields[0] |= uint64(0x00000001)
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Method", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowRpcMsg
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthRpcMsg
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Method = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000002)
-		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Args", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowRpcMsg
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthRpcMsg
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			var keykey uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowRpcMsg
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				keykey |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			var stringLenmapkey uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowRpcMsg
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLenmapkey |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLenmapkey := int(stringLenmapkey)
-			if intStringLenmapkey < 0 {
-				return ErrInvalidLengthRpcMsg
-			}
-			postStringIndexmapkey := iNdEx + intStringLenmapkey
-			if postStringIndexmapkey > l {
-				return io.ErrUnexpectedEOF
-			}
-			mapkey := string(dAtA[iNdEx:postStringIndexmapkey])
-			iNdEx = postStringIndexmapkey
-			if m.Args == nil {
-				m.Args = make(map[string]string)
-			}
-			if iNdEx < postIndex {
-				var valuekey uint64
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return ErrIntOverflowRpcMsg
-					}
-					if iNdEx >= l {
-						return io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					valuekey |= (uint64(b) & 0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				var stringLenmapvalue uint64
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return ErrIntOverflowRpcMsg
-					}
-					if iNdEx >= l {
-						return io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					stringLenmapvalue |= (uint64(b) & 0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				intStringLenmapvalue := int(stringLenmapvalue)
-				if intStringLenmapvalue < 0 {
-					return ErrInvalidLengthRpcMsg
-				}
-				postStringIndexmapvalue := iNdEx + intStringLenmapvalue
-				if postStringIndexmapvalue > l {
-					return io.ErrUnexpectedEOF
-				}
-				mapvalue := string(dAtA[iNdEx:postStringIndexmapvalue])
-				iNdEx = postStringIndexmapvalue
-				m.Args[mapkey] = mapvalue
-			} else {
-				var mapvalue string
-				m.Args[mapkey] = mapvalue
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipRpcMsg(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthRpcMsg
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("call_seq")
-	}
-	if hasFields[0]&uint64(0x00000002) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("method")
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *RPCMethodCallNoReturn) Unmarshal(dAtA []byte) error {
-	var hasFields [1]uint64
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowRpcMsg
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: RPCMethodCallNoReturn: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: RPCMethodCallNoReturn: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -1301,7 +985,7 @@ var (
 func init() { proto.RegisterFile("rpc_msg.proto", fileDescriptorRpcMsg) }
 
 var fileDescriptorRpcMsg = []byte{
-	// 371 bytes of a gzipped FileDescriptorProto
+	// 352 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xe2, 0xe2, 0x2d, 0x2a, 0x48, 0x8e,
 	0xcf, 0x2d, 0x4e, 0xd7, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x2e, 0x2a, 0x48, 0x56, 0xd2,
 	0xe3, 0xe2, 0x09, 0x0a, 0x70, 0xf6, 0x48, 0xcc, 0x4b, 0x09, 0xce, 0x48, 0xcc, 0x4e, 0x15, 0x92,
@@ -1314,16 +998,14 @@ var fileDescriptorRpcMsg = []byte{
 	0x20, 0x59, 0x0f, 0xc5, 0x02, 0x3d, 0xc7, 0xa2, 0xf4, 0x62, 0xd7, 0xbc, 0x92, 0xa2, 0xca, 0x20,
 	0xb0, 0x4a, 0x29, 0x67, 0x2e, 0x4e, 0xb8, 0x90, 0x90, 0x18, 0x17, 0x73, 0x76, 0x6a, 0xa5, 0x04,
 	0xa3, 0x02, 0x23, 0xdc, 0x64, 0x90, 0x80, 0x90, 0x14, 0x17, 0x6b, 0x59, 0x62, 0x4e, 0x69, 0xaa,
-	0x04, 0x13, 0x92, 0x0c, 0x44, 0xc8, 0x8a, 0xc9, 0x82, 0x51, 0xe9, 0x2a, 0x23, 0x97, 0x28, 0x8a,
-	0x35, 0x7e, 0xf9, 0x41, 0xa9, 0x25, 0xa5, 0x45, 0x79, 0x94, 0xfa, 0xc7, 0x02, 0xc5, 0x3f, 0x2a,
-	0x98, 0xfe, 0x81, 0x59, 0x44, 0x33, 0x7f, 0xf1, 0xc3, 0xad, 0xa3, 0x8e, 0x8f, 0xac, 0xb9, 0xd8,
-	0x8b, 0xc0, 0x06, 0xc1, 0x3c, 0xa5, 0x88, 0xea, 0x29, 0xa8, 0x77, 0x20, 0x14, 0xd4, 0x47, 0x30,
-	0x1d, 0x52, 0x6e, 0x5c, 0x3c, 0xc8, 0x12, 0xe4, 0xfa, 0x4b, 0x2b, 0x9d, 0x8b, 0x33, 0x28, 0xc0,
-	0x39, 0xde, 0x37, 0xd8, 0xdd, 0xd3, 0x45, 0x48, 0x8c, 0x8b, 0xd3, 0xc3, 0xd1, 0xcf, 0x25, 0xd8,
-	0xc3, 0xd1, 0xdb, 0x55, 0xa0, 0xe1, 0xdf, 0x7f, 0x08, 0x60, 0x14, 0x12, 0xe4, 0x62, 0x71, 0x76,
-	0xf4, 0xf1, 0x11, 0x68, 0xf8, 0x03, 0x17, 0x92, 0xe2, 0xe2, 0x05, 0x09, 0xc5, 0xfb, 0xf9, 0x07,
-	0xb9, 0x86, 0x84, 0x06, 0xf9, 0x09, 0xfc, 0xff, 0x0d, 0x97, 0x13, 0xe6, 0x62, 0x83, 0x0a, 0xfe,
-	0x83, 0x0b, 0x3a, 0x09, 0x9c, 0x78, 0x24, 0xc7, 0x78, 0xe1, 0x91, 0x1c, 0xe3, 0x83, 0x47, 0x72,
-	0x8c, 0x13, 0x1e, 0xcb, 0x31, 0x00, 0x02, 0x00, 0x00, 0xff, 0xff, 0x88, 0x92, 0x8f, 0x60, 0x37,
-	0x03, 0x00, 0x00,
+	0x04, 0x13, 0x92, 0x0c, 0x44, 0xc8, 0x8a, 0xc9, 0x82, 0x51, 0xe9, 0x2a, 0x23, 0x17, 0x3f, 0xdc,
+	0x9a, 0xa0, 0xd4, 0x92, 0xd2, 0xa2, 0x3c, 0x4a, 0x7d, 0x62, 0xcd, 0xc5, 0x5e, 0x04, 0x36, 0x08,
+	0xe6, 0x19, 0x45, 0x54, 0xcf, 0x40, 0x6c, 0xd1, 0x83, 0x50, 0x50, 0x1f, 0xc1, 0x74, 0x48, 0xb9,
+	0x71, 0xf1, 0x20, 0x4b, 0x90, 0xeb, 0x2f, 0xad, 0x74, 0x2e, 0xce, 0xa0, 0x00, 0xe7, 0x78, 0xdf,
+	0x60, 0x77, 0x4f, 0x17, 0x21, 0x31, 0x2e, 0x4e, 0x0f, 0x47, 0x3f, 0x97, 0x60, 0x0f, 0x47, 0x6f,
+	0x57, 0x81, 0x86, 0x7f, 0xff, 0x21, 0x80, 0x51, 0x48, 0x90, 0x8b, 0xc5, 0xd9, 0xd1, 0xc7, 0x47,
+	0xa0, 0xe1, 0x0f, 0x5c, 0x48, 0x8a, 0x8b, 0x17, 0x24, 0x14, 0xef, 0xe7, 0x1f, 0xe4, 0x1a, 0x12,
+	0x1a, 0xe4, 0x27, 0xf0, 0xff, 0x37, 0x5c, 0x4e, 0x98, 0x8b, 0x0d, 0x2a, 0xf8, 0x0f, 0x2e, 0xe8,
+	0x24, 0x70, 0xe2, 0x91, 0x1c, 0xe3, 0x85, 0x47, 0x72, 0x8c, 0x0f, 0x1e, 0xc9, 0x31, 0x4e, 0x78,
+	0x2c, 0xc7, 0x00, 0x08, 0x00, 0x00, 0xff, 0xff, 0x0b, 0x4d, 0x39, 0xf2, 0x5f, 0x02, 0x00, 0x00,
 }

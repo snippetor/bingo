@@ -7,62 +7,43 @@ import (
 	"sync"
 	"time"
 	"math/rand"
+	"github.com/snippetor/bingo/utils"
 )
 
 var (
 	defaultCodec codec.ICodec
-	callbacks    map[int32]callbackWrapper
 )
-
-type callbackWrapper struct {
-	c RPCCallback
-	t time.Duration
-}
 
 func init() {
 	defaultCodec = codec.NewCodec(codec.Protobuf)
-	// RPC调用超时检测
-	go func() {
-		t := time.NewTicker(time.Second)
-		select {
-		case t.C:
-			for seq, w := range callbacks {
-				if w.c == nil {
-					delete(callbacks, seq)
-					continue
-				}
-				if w.t > 2*time.Second { // 两秒超时
-					bingo.W("-- RPC method callback timeout, retry it %d --", seq)
-					w.t = 0
-				}
-			}
-		}
-	}()
 }
 
 type RPCEnd struct {
-	connId net.Identity
+	connId utils.Identity
 	name   string
 }
 
 type Server struct {
-	serv net.IServer
-	end  map[string][]*RPCEnd
-	l    *sync.RWMutex
+	serv       net.IServer
+	end        map[string][]*RPCEnd
+	l          *sync.RWMutex
+	identifier *utils.Identifier
+	callSyncWorker
 }
 
 func (s *Server) Listen(port int) {
 	s.l = &sync.RWMutex{}
 	s.end = make(map[string][]*RPCEnd)
+	s.identifier = utils.NewIdentifier(2)
 	if s.serv = net.GoListen(net.Tcp, port, s.handleMessage); s.serv == nil {
 		bingo.E("-- start rpc server failed! --")
 	}
 }
 
-func (s *Server) Call(endName, method string, args Args, callback RPCCallback) {
+func (s *Server) Call(endName, method string, args Args, callback RPCCallback) bool {
 	if s.serv == nil {
 		bingo.E("-- call rpc method %s failed! rpc server no startup --", method)
-		return
+		return false
 	}
 	s.l.RLock()
 	defer s.l.RUnlock()
@@ -70,16 +51,21 @@ func (s *Server) Call(endName, method string, args Args, callback RPCCallback) {
 		size := len(ends)
 		if size == 0 {
 			bingo.E("-- call rpc method failed! no end connected with name is %s --", endName)
-			return
+			return false
 		}
+		// 随机均衡
 		var i int = 0
 		if size > 1 {
 			i = rand.Intn(len(ends))
 		}
 		if conn, ok := s.serv.GetConnection(ends[i].connId); ok {
-			if body, err := defaultCodec.Marshal(&RPCMethodCall{Method: method, Args: args}); err == nil {
+			seq := s.identifier.GenIdentity()
+			if body, err := defaultCodec.Marshal(&RPCMethodCall{CallSeq: int32(seq), Method: method, Args: args}); err == nil {
 				if !conn.Send(net.MessageId(RPC_MSGID_CALL), body) {
 					bingo.E("-- call rpc method %s failed! send message failed --", method)
+				} else {
+					s.waitingResult(&callTask{seq: seq, conn: conn, msg: body, c: callback, t: time.Now().UnixNano()})
+					return true
 				}
 			} else {
 				bingo.E("-- call rpc method %s failed! marshal message failed --", method)
@@ -90,6 +76,44 @@ func (s *Server) Call(endName, method string, args Args, callback RPCCallback) {
 	} else {
 		bingo.E("-- call rpc method failed! no end connected with name is %s --", endName)
 	}
+	return false
+}
+
+func (s *Server) CallNoReturn(endName, method string, args Args) bool {
+	if s.serv == nil {
+		bingo.E("-- call rpc noreturn method %s failed! rpc server no startup --", method)
+		return false
+	}
+	s.l.RLock()
+	defer s.l.RUnlock()
+	if ends, ok := s.end[endName]; ok {
+		size := len(ends)
+		if size == 0 {
+			bingo.E("-- call rpc noreturn method failed! no end connected with name is %s --", endName)
+			return false
+		}
+		// 随机均衡
+		var i int = 0
+		if size > 1 {
+			i = rand.Intn(len(ends))
+		}
+		if conn, ok := s.serv.GetConnection(ends[i].connId); ok {
+			if body, err := defaultCodec.Marshal(&RPCMethodCall{CallSeq: int32(s.identifier.GenIdentity()), Method: method, Args: args}); err == nil {
+				if !conn.Send(net.MessageId(RPC_MSGID_CALL), body) {
+					bingo.E("-- call rpc noreturn method %s failed! send message failed --", method)
+				} else {
+					return true
+				}
+			} else {
+				bingo.E("-- call rpc noreturn method %s failed! marshal message failed --", method)
+			}
+		} else {
+			bingo.E("-- call rpc noreturn method %s failed! no connection for call --", method)
+		}
+	} else {
+		bingo.E("-- call rpc noreturn method failed! no end connected with name is %s --", endName)
+	}
+	return false
 }
 
 func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
@@ -131,20 +155,53 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 		}
 		bingo.D("@call method %s with args %s", call.Method, call.Args)
 		ctx := &Context{conn: conn, method: call.Method, Args: call.Args}
+		r := callMethod(call.Method, ctx)
+		var rets map[string]string
+		if r == nil {
+			rets = make(map[string]string)
+		} else {
+			rets = r.Args
+		}
+		if body, err := defaultCodec.Marshal(&RPCMethodReturn{CallSeq: call.CallSeq, Method: call.Method, Returns: rets}); err == nil {
+			if !conn.Send(net.MessageId(RPC_MSGID_RETURN), body) {
+				bingo.E("-- return rpc method %s failed! send message failed --", call.Method)
+			}
+		} else {
+			bingo.E("-- return rpc method %s failed! marshal message failed --", call.Method)
+		}
+	case RPC_MSGID_CALL_NORETURN:
+		call := &RPCMethodCall{}
+		if err := defaultCodec.Unmarshal(body, call); err != nil {
+			bingo.E("-- RPC noreturn call failed! -- ")
+			return
+		}
+		bingo.D("@call noreturn method %s(%d) with args %s", call.Method, call.CallSeq, call.Args)
+		ctx := &Context{conn: conn, method: call.Method, Args: call.Args}
 		callMethod(call.Method, ctx)
+	case RPC_MSGID_RETURN:
+		ret := &RPCMethodReturn{}
+		if err := defaultCodec.Unmarshal(body, ret); err != nil {
+			bingo.E("-- RPC return failed! -- ")
+			return
+		}
+		bingo.D("@receive return from RPC method %s(%d) with result %s", ret.Method, ret.CallSeq, ret.Returns)
+		s.receiveResult(utils.Identity(ret.CallSeq), &Result{Args: ret.Returns})
 	}
 }
 
 type Client struct {
-	conn  net.IConn
-	l     *sync.RWMutex
-	addr  string
-	state net.ConnState
+	conn       net.IConn
+	l          *sync.RWMutex
+	addr       string
+	state      net.ConnState
+	identifier *utils.Identifier
+	callSyncWorker
 }
 
 func (c *Client) Connect(serverAddress string) {
 	c.state = net.STATE_CONNECTING
 	c.addr = serverAddress
+	c.identifier = utils.NewIdentifier(3)
 	c.l = &sync.RWMutex{}
 	if net.GoConnect(net.Tcp, serverAddress, c.handleMessage) == nil {
 		c.state = net.STATE_CLOSED
@@ -154,29 +211,53 @@ func (c *Client) Connect(serverAddress string) {
 	}
 }
 
-func (c *Client) Call(method string, args Args) {
+func (c *Client) Call(method string, args Args, callback RPCCallback) bool {
 	if c.conn == nil {
 		bingo.E("-- call rpc method %s failed! rpc client not connect to server --", method)
-		return
+		return false
+	}
+	c.l.RLock()
+	defer c.l.RUnlock()
+	seq := c.identifier.GenIdentity()
+	if body, err := defaultCodec.Marshal(&RPCMethodCall{CallSeq: int32(seq), Method: method, Args: args}); err == nil {
+		if !c.conn.Send(net.MessageId(RPC_MSGID_CALL), body) {
+			bingo.E("-- call rpc method %s failed! send message failed --", method)
+		} else {
+			c.waitingResult(&callTask{seq: seq, conn: c.conn, msg: body, c: callback, t: time.Now().UnixNano()})
+			return true
+		}
+	} else {
+		bingo.E("-- call rpc method %s failed! marshal message failed --", method)
+	}
+	return false
+}
+
+func (c *Client) CallNoReturn(method string, args Args) bool {
+	if c.conn == nil {
+		bingo.E("-- call rpc method %s failed! rpc client not connect to server --", method)
+		return false
 	}
 	c.l.RLock()
 	defer c.l.RUnlock()
 	if body, err := defaultCodec.Marshal(&RPCMethodCall{Method: method, Args: args}); err == nil {
 		if !c.conn.Send(net.MessageId(RPC_MSGID_CALL), body) {
-			bingo.E("-- call rpc method %s.%s failed! send message failed --", method)
+			bingo.E("-- call rpc method %s failed! send message failed --", method)
+		} else {
+			return true
 		}
 	} else {
 		bingo.E("-- call rpc method %s failed! marshal message failed --", method)
 	}
+	return false
 }
 
 func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
-	switch int32(msgId) {
-	case net.MSGID_CONNECT_DISCONNECT:
+	switch RPC_MSGID(msgId) {
+	case RPC_MSGID(net.MSGID_CONNECT_DISCONNECT):
 		c.conn = nil
 		c.state = net.STATE_CLOSED
 		c.reconnect()
-	case int32(RPC_MSGID_CALL):
+	case RPC_MSGID_CALL:
 		call := &RPCMethodCall{}
 		if err := defaultCodec.Unmarshal(body, call); err != nil {
 			bingo.E("-- RPC call failed! -- ")
@@ -184,12 +265,43 @@ func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 		}
 		bingo.D("@call method %s with args %s", call.Method, call.Args)
 		ctx := &Context{conn: conn, method: call.Method, Args: call.Args}
+		r := callMethod(call.Method, ctx)
+		var rets map[string]string
+		if r == nil {
+			rets = make(map[string]string)
+		} else {
+			rets = r.Args
+		}
+		if body, err := defaultCodec.Marshal(&RPCMethodReturn{CallSeq: call.CallSeq, Method: call.Method, Returns: rets}); err == nil {
+			if !conn.Send(net.MessageId(RPC_MSGID_RETURN), body) {
+				bingo.E("-- return rpc method %s failed! send message failed --", call.Method)
+			}
+		} else {
+			bingo.E("-- return rpc method %s failed! marshal message failed --", call.Method)
+		}
+	case RPC_MSGID_CALL_NORETURN:
+		call := &RPCMethodCall{}
+		if err := defaultCodec.Unmarshal(body, call); err != nil {
+			bingo.E("-- RPC noreturn call failed! -- ")
+			return
+		}
+		bingo.D("@call noreturn method %s(%d) with args %s", call.Method, call.CallSeq, call.Args)
+		ctx := &Context{conn: conn, method: call.Method, Args: call.Args}
 		callMethod(call.Method, ctx)
+	case RPC_MSGID_RETURN:
+		ret := &RPCMethodReturn{}
+		if err := defaultCodec.Unmarshal(body, ret); err != nil {
+			bingo.E("-- RPC return failed! -- ")
+			return
+		}
+		bingo.D("@receive return from RPC method %s(%d) with result %s", ret.Method, ret.CallSeq, ret.Returns)
+		c.receiveResult(utils.Identity(ret.CallSeq), &Result{Args: ret.Returns})
 	}
 }
 
 func (c *Client) reconnect() {
 	if net.STATE_CLOSED == c.state {
+		bingo.D("@reconnect RPC, remote address=%s", c.addr)
 		if net.GoConnect(net.Tcp, c.addr, c.handleMessage) == nil {
 			time.Sleep(1 * time.Second)
 			c.state = net.STATE_CLOSED

@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"github.com/snippetor/bingo/net"
-	"github.com/snippetor/bingo"
 	"strconv"
 )
 
@@ -106,20 +105,6 @@ func (a Args) MustGetBool(key string, def bool) bool {
 
 type Context struct {
 	conn   net.IConn
-	method string
+	Method string
 	Args
-}
-
-func (c *Context) Callback(method string, args Args) {
-	if c.conn == nil {
-		bingo.E("-- call rpc method %s failed! Context#conn is nil --", method)
-	} else {
-		if body, err := defaultCodec.Marshal(&RPCMethodCall{Method: method, Args: args}); err == nil {
-			if !c.conn.Send(net.MessageId(RPC_MSGID_CALL), body) {
-				bingo.E("-- call rpc method %s.%s failed! send message failed --", method)
-			}
-		} else {
-			bingo.E("-- call rpc method %s failed! marshal message failed --", method)
-		}
-	}
 }

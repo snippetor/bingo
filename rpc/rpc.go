@@ -154,7 +154,7 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 			return
 		}
 		bingo.D("@call method %s with args %s", call.Method, call.Args)
-		ctx := &Context{conn: conn, method: call.Method, Args: call.Args}
+		ctx := &Context{conn: conn, Method: call.Method, Args: call.Args}
 		r := callMethod(call.Method, ctx)
 		var rets map[string]string
 		if r == nil {
@@ -176,7 +176,7 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 			return
 		}
 		bingo.D("@call noreturn method %s(%d) with args %s", call.Method, call.CallSeq, call.Args)
-		ctx := &Context{conn: conn, method: call.Method, Args: call.Args}
+		ctx := &Context{conn: conn, Method: call.Method, Args: call.Args}
 		callMethod(call.Method, ctx)
 	case RPC_MSGID_RETURN:
 		ret := &RPCMethodReturn{}
@@ -187,6 +187,16 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 		bingo.D("@receive return from RPC method %s(%d) with result %s", ret.Method, ret.CallSeq, ret.Returns)
 		s.receiveResult(utils.Identity(ret.CallSeq), &Result{Args: ret.Returns})
 	}
+}
+
+func (s *Server) HasEndName(endName string) bool {
+	if s.end == nil {
+		return false
+	}
+	if _, ok := s.end[endName]; ok {
+		return true
+	}
+	return false
 }
 
 type Client struct {
@@ -264,7 +274,7 @@ func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 			return
 		}
 		bingo.D("@call method %s with args %s", call.Method, call.Args)
-		ctx := &Context{conn: conn, method: call.Method, Args: call.Args}
+		ctx := &Context{conn: conn, Method: call.Method, Args: call.Args}
 		r := callMethod(call.Method, ctx)
 		var rets map[string]string
 		if r == nil {
@@ -286,7 +296,7 @@ func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 			return
 		}
 		bingo.D("@call noreturn method %s(%d) with args %s", call.Method, call.CallSeq, call.Args)
-		ctx := &Context{conn: conn, method: call.Method, Args: call.Args}
+		ctx := &Context{conn: conn, Method: call.Method, Args: call.Args}
 		callMethod(call.Method, ctx)
 	case RPC_MSGID_RETURN:
 		ret := &RPCMethodReturn{}

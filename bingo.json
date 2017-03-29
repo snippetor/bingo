@@ -5,13 +5,17 @@
   "node": [
     {
       "name": "master",
-      "domain": 0
+      "model": "master",
+      "domain": 0,
+      "rpc-port": 9092
     },
     {
       "name": "auth",
+      "model": "auth",
       "domain": 0,
       "service": [
         {
+          "name":"http8080",
           "type": "http",
           "port": 8080
         }
@@ -19,20 +23,24 @@
     },
     {
       "name": "gate1",
+      "model": "gate",
       "domain": 0,
       "service": [
         {
+          "name":"tcp9090",
           "type": "tcp",
           "port": 9090,
           "codec": "protobuf"
         }
       ],
+      "rpc-port": 9091,
       "rpc-to": [
         "master"
       ]
     },
     {
       "name": "game1",
+      "model": "game",
       "domain": 0,
       "rpc-to": [
         "master",

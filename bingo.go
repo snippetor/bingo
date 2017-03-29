@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"flag"
 	"runtime"
+	"os"
+	"sort"
 )
 
 var (
@@ -37,46 +39,80 @@ func E(format string, v ...interface{}) {
 }
 
 var (
-	config = flag.String("c", "", "config file path or file name in current fold")
-	node   = flag.String("n", "", "startup which node, with its name")
-	all    = flag.Bool("a", false, "startup all nodes in one server")
+	node       = flag.String("n", "", "startup which node, with its name")
+	proc       = flag.Int("p", -1, "cpu core size for runtime.GOMAXPROCS, default is runtime.NumCPU")
+	help       = flag.Bool("h", false, "help")
+	version    = flag.Bool("v", false, "bingo framework version")
+	endRunning = make(chan bool, 1)
+	usage      = `
+	 Usage:
+	 *if archive file name is echo
+	 echo [command] [config file] [options]
+
+	 Command:
+	 start : startup node
+	 stop  : stop node
+
+	 Options:
+	 -n : operate which node, with its name, if not set -n, all nodes will be operated
+	 -p : cpu core size for runtime.GOMAXPROCS, default is runtime.NumCPU
+	 -h : help
+	 -v : bingo framework version
+
+	 Example:
+	 1. startup master node with config file bingo.json
+	 echo -c bingo.json -n master
+	 2. startup all nodes with config file bingo.json
+	 echo start bingo.json -a or echo start bingo.json
+	`
+	commands = []string{"start", "stop"}
 )
 
 func Run() {
-	// Usage:
-	// *if archive file name is echo
-	// echo [options]
-	//
-	// Options:
-	// -c : config file path or file name in current fold
-	// -n : startup which node, with its name
-	// -a : startup all nodes in one server
-	// -p : cpu core size for runtime.GOMAXPROCS, default is runtime.NumCPU
-	// -h : help
-	//
-	// Example:
-	// 1. startup master node with config file bingo.json
-	// echo -c bingo.json -n master
-	// 2. startup all nodes with config file bingo.json
-	// echo -c bingo.json -a
-	flag.Parse()
 
-	config := *config
-	node := *node
-	all := *all
+	if len(os.Args) == 1 {
+		fmt.Println(usage)
+		return
+	}
+
+	if len(os.Args) < 3 {
+		fmt.Println(usage)
+		return
+	}
+	cmd := os.Args[1]
+	config := os.Args[2]
+
+	if sort.SearchStrings(commands, cmd) < 0 {
+		fmt.Println("command must be one of", commands)
+		return
+	}
 
 	if config == "" {
-		fmt.Println("-c must be set with config file path or file name in current fold")
-		return
-	}
-	if !all && node == "" {
-		fmt.Println("-n must be set when not use -a for startup all nodes")
+		fmt.Println("config file must be set")
 		return
 	}
 
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	fmt.Println(config)
-	fmt.Println(node)
-	fmt.Println(all)
+	flag.Parse()
 
+	node := *node
+	proc := *proc
+	help := *help
+	version := *version
+
+	if help {
+		fmt.Println(usage)
+		return
+	}
+	if version {
+		fmt.Println(Version())
+		return
+	}
+
+	if proc == -1 {
+		runtime.GOMAXPROCS(runtime.NumCPU())
+	} else {
+		runtime.GOMAXPROCS(proc)
+	}
+
+	<-endRunning
 }

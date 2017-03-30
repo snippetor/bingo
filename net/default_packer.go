@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"bytes"
 	"math"
-	"github.com/snippetor/bingo"
+	"github.com/snippetor/bingo/log/fwlogger"
 )
 
 // 消息包
@@ -15,7 +15,7 @@ type DefaultMessagePacker struct {
 func (p *DefaultMessagePacker) Pack(messageId MessageId, body MessageBody) []byte {
 	bodyLen := len(body)
 	if body != nil && bodyLen > math.MaxInt32 {
-		bingo.E("-- MessagePacker - body length is too large! %d --", len(body))
+		fwlogger.E("-- MessagePacker - body length is too large! %d --", len(body))
 		return nil
 	}
 	pk := make([]byte, 0)
@@ -56,9 +56,9 @@ func (p *DefaultMessagePacker) Unpack(buffer []byte) (MessageId, MessageBody, []
 		buf.Write(buffer[4:8])
 		binary.Read(buf, binary.BigEndian, &id)
 		// 剩余为包体
-		ret := buffer[8:4 + length]
-		if int(4 + length) < len(buffer) {
-			buffer = buffer[4 + length:]
+		ret := buffer[8:4+length]
+		if int(4+length) < len(buffer) {
+			buffer = buffer[4+length:]
 		} else {
 			buffer = make([]byte, 0)
 		}

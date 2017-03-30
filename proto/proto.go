@@ -3,7 +3,7 @@ package proto
 import (
 	"github.com/snippetor/bingo/net"
 	"github.com/snippetor/bingo/codec"
-	"github.com/snippetor/bingo"
+	"github.com/snippetor/bingo/log/fwlogger"
 )
 
 type MessageProtocol struct {
@@ -40,7 +40,7 @@ func (mp *MessageProtocol) Marshal(v interface{}) (net.MessageBody, bool) {
 	if b, err := mp.c.Marshal(v); err == nil {
 		return b, true
 	}
-	bingo.E("-- proto Marshal message failed! --")
+	fwlogger.E("-- proto Marshal message failed! --")
 	return nil, false
 }
 
@@ -50,37 +50,37 @@ func (mp *MessageProtocol) Marshal(v interface{}) (net.MessageBody, bool) {
 func (mp *MessageProtocol) UnmarshalTo(msgId net.MessageId, data net.MessageBody, clientProtoVersion string) (interface{}, bool) {
 	if v, ok := mp.p.Get(msgId, clientProtoVersion); ok {
 		if err := mp.c.Unmarshal(data, v); err != nil {
-			bingo.E("-- proto UnmarshalTo message failed! --")
+			fwlogger.E("-- proto UnmarshalTo message failed! --")
 			return nil, false
 		}
 		return v, true
 	} else if v, ok := mp.p.GetDefault(msgId); ok {
 		if err := mp.c.Unmarshal(data, v); err != nil {
-			bingo.E("-- proto UnmarshalTo message failed! --")
+			fwlogger.E("-- proto UnmarshalTo message failed! --")
 			return nil, false
 		}
 		return v, true
 	}
-	bingo.E("-- proto UnmarshalTo message failed! no found message struct for msgid #%d --", int(msgId))
+	fwlogger.E("-- proto UnmarshalTo message failed! no found message struct for msgid #%d --", int(msgId))
 	return nil, false
 }
 
 func (mp *MessageProtocol) UnmarshalToDefault(msgId net.MessageId, data net.MessageBody) (interface{}, bool) {
 	if v, ok := mp.p.GetDefault(msgId); ok {
 		if err := mp.c.Unmarshal(data, v); err != nil {
-			bingo.E("-- proto UnmarshalTo message failed! --")
+			fwlogger.E("-- proto UnmarshalTo message failed! --")
 			return nil, false
 		}
 		return v, true
 	}
-	bingo.E("-- proto UnmarshalTo message failed! no found message struct for msgid #%d --", int(msgId))
+	fwlogger.E("-- proto UnmarshalTo message failed! no found message struct for msgid #%d --", int(msgId))
 	return nil, false
 }
 
 // 直接解析成结构体
 func (mp *MessageProtocol) Unmarshal(data net.MessageBody, v interface{}) bool {
 	if err := mp.c.Unmarshal(data, v); err != nil {
-		bingo.E("-- proto Unmarshal message failed! --")
+		fwlogger.E("-- proto Unmarshal message failed! --")
 		return false
 	}
 	return true

@@ -1,7 +1,6 @@
 package bingo
 
 import (
-	"github.com/snippetor/bingo/log"
 	"fmt"
 	"flag"
 	"runtime"
@@ -11,35 +10,6 @@ import (
 	"github.com/snippetor/bingo/node"
 	"path/filepath"
 )
-
-var (
-	// bingo框架日志
-	fwLogger *log.Logger
-)
-
-func init() {
-	fwLogger = log.NewLoggerWithConfig(log.DEFAULT_CONFIG)
-}
-
-func Version() string {
-	return "1.0"
-}
-
-func I(format string, v ...interface{}) {
-	fwLogger.I(format, v...)
-}
-
-func D(format string, v ...interface{}) {
-	fwLogger.D(format, v...)
-}
-
-func W(format string, v ...interface{}) {
-	fwLogger.W(format, v...)
-}
-
-func E(format string, v ...interface{}) {
-	fwLogger.E(format, v...)
-}
 
 var (
 	n          = flag.String("n", "", "startup which node, with its name")
@@ -70,6 +40,14 @@ var (
 	`
 	commands = []string{"start", "stop"}
 )
+
+func Version() string {
+	return "1.0"
+}
+
+func BindNodeModel(modelName string, model interface{}) {
+	node.BindNodeModel(modelName, model.(node.IModel))
+}
 
 func Run() {
 

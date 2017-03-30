@@ -10,6 +10,7 @@ type MessageBody []byte
 
 const (
 	MSGID_CONNECT_DISCONNECT = -1
+	MSGID_CONNECT_CONNECTED = -2
 )
 
 // 消息回调

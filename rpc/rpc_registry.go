@@ -12,16 +12,20 @@ var (
 )
 
 // 注册单个方法
-func RegisterMethod(methodName string, f RPCMethod) {
+func RegisterMethod(target, methodName string, f RPCMethod) {
 	if methods == nil {
 		methods = make(map[string]RPCMethod)
 	}
-	methods[methodName] = f
+	methods[makeKey(target, methodName)] = f
 }
 
-func callMethod(methodName string, ctx *Context) *Result {
-	if v, ok := methods[methodName]; ok {
+func callMethod(target, methodName string, ctx *Context) *Result {
+	if v, ok := methods[makeKey(target, methodName)]; ok {
 		return v(ctx)
 	}
 	return nil
+}
+
+func makeKey(target, methodName string) string {
+	return target + "." + methodName
 }

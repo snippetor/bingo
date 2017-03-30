@@ -2,11 +2,11 @@ package net
 
 import (
 	"net"
-	"github.com/snippetor/bingo"
 	"strconv"
 	"github.com/snippetor/bingo/comm"
 	"sync"
 	"github.com/snippetor/bingo/utils"
+	"github.com/snippetor/bingo/log/fwlogger"
 )
 
 type tcpConn struct {
@@ -19,7 +19,7 @@ func (c *tcpConn) Send(msgId MessageId, body MessageBody) bool {
 		c.conn.Write(GetDefaultMessagePacker().Pack(msgId, body))
 		return true
 	} else {
-		bingo.W("-- send message failed!!! --")
+		fwlogger.W("-- send message failed!!! --")
 		return false
 	}
 }
@@ -59,29 +59,30 @@ type tcpServer struct {
 func (s *tcpServer) listen(port int, callback IMessageCallback) bool {
 	addr, err := net.ResolveTCPAddr("tcp", ":"+strconv.Itoa(port))
 	if err != nil {
-		bingo.E(err.Error())
+		fwlogger.E(err.Error())
 		return false
 	}
 	listener, err := net.ListenTCP("tcp", addr)
 	if err != nil {
-		bingo.E(err.Error())
+		fwlogger.E(err.Error())
 		return false
 	}
 	defer listener.Close()
 	s.listener = listener
 	s.clients = make(map[utils.Identity]IConn, 0)
-	bingo.I("Tcp server runnning on :%d", port)
+	fwlogger.I("Tcp server runnning on :%d", port)
 	for {
 		conn, err := listener.AcceptTCP()
 		if err != nil {
 			continue
 		}
-		bingo.I(conn.RemoteAddr().String(), " tcp connect success")
+		fwlogger.I(conn.RemoteAddr().String() + " %s", " tcp connect success")
 		c := IConn(&tcpConn{conn: conn})
 		c.setState(STATE_CONNECTED)
 		s.Lock()
 		s.clients[c.Identity()] = c
 		s.Unlock()
+		callback(c, MSGID_CONNECT_CONNECTED, nil)
 		go s.handleConnection(c, callback)
 	}
 	return true
@@ -95,7 +96,7 @@ func (s *tcpServer) handleConnection(conn IConn, callback IMessageCallback) {
 	for {
 		l, err := conn.read(&buf)
 		if err != nil {
-			bingo.E(err.Error())
+			fwlogger.E(err.Error())
 			conn.setState(STATE_CLOSED)
 			callback(conn, MSGID_CONNECT_DISCONNECT, nil)
 			s.Lock()
@@ -107,10 +108,11 @@ func (s *tcpServer) handleConnection(conn IConn, callback IMessageCallback) {
 		packer := GetDefaultMessagePacker()
 		for {
 			id, body, remains := packer.Unpack(byteBuffer)
+			if body != nil {
+				callback(conn, id, body)
+			}
 			if body == nil || len(remains) == 0 {
 				break
-			} else {
-				callback(conn, id, body)
 			}
 		}
 	}
@@ -143,23 +145,21 @@ type tcpClient struct {
 }
 
 func (c *tcpClient) connect(serverAddr string, callback IMessageCallback) bool {
-	c.conn.setState(STATE_CONNECTING)
 	addr, err := net.ResolveTCPAddr("tcp", serverAddr)
 	if err != nil {
-		bingo.E(err.Error())
-		c.conn.setState(STATE_CLOSED)
+		fwlogger.E(err.Error())
 		return false
 	}
 	conn, err := net.DialTCP("tcp", nil, addr)
 	if err != nil {
-		bingo.E(err.Error())
-		c.conn.setState(STATE_CLOSED)
+		fwlogger.E(err.Error())
 		return false
 	}
 	defer conn.Close()
 	c.conn = IConn(&tcpConn{conn: conn})
 	c.conn.setState(STATE_CONNECTED)
-	bingo.I("Tcp connect server ok :%s", serverAddr)
+	callback(c.conn, MSGID_CONNECT_CONNECTED, nil)
+	fwlogger.I("Tcp connect server ok :%s", serverAddr)
 	c.handleConnection(c.conn, callback)
 	return true
 }
@@ -172,7 +172,7 @@ func (c *tcpClient) handleConnection(conn IConn, callback IMessageCallback) {
 	for {
 		l, err := conn.read(&buf)
 		if err != nil {
-			bingo.E(err.Error())
+			fwlogger.E(err.Error())
 			c.conn.setState(STATE_CLOSED)
 			callback(conn, MSGID_CONNECT_DISCONNECT, nil)
 			c.conn = nil
@@ -182,10 +182,11 @@ func (c *tcpClient) handleConnection(conn IConn, callback IMessageCallback) {
 		packer := GetDefaultMessagePacker()
 		for {
 			id, body, remains := packer.Unpack(byteBuffer)
+			if body != nil {
+				callback(conn, id, body)
+			}
 			if body == nil || len(remains) == 0 {
 				break
-			} else {
-				callback(conn, id, body)
 			}
 		}
 	}
@@ -197,7 +198,7 @@ func (c *tcpClient) Send(msgId MessageId, body MessageBody) bool {
 	if c.conn != nil && c.conn.GetState() == STATE_CONNECTED {
 		return c.conn.Send(msgId, body)
 	} else {
-		bingo.W("-- send tcp message failed!!! conn wrong state --")
+		fwlogger.W("-- send tcp message failed!!! conn wrong state --")
 	}
 	return false
 }

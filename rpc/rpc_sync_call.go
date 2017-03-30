@@ -4,7 +4,7 @@ import (
 	"time"
 	"github.com/snippetor/bingo/utils"
 	"github.com/snippetor/bingo/net"
-	"github.com/snippetor/bingo"
+	"github.com/snippetor/bingo/log/fwlogger"
 )
 
 type callTask struct {
@@ -40,10 +40,10 @@ func (w *callSyncWorker) waitingResult(t *callTask) {
 							delete(w.callTasks, seq)
 						} else {
 							if (now.UnixNano() - t.t) > int64(2*time.Second) { // 两秒超时
-								bingo.W("-- RPC method callback timeout, retry it %s(%d) %d %s --", t.method, seq, t.conn.Identity(), t.conn.Address())
+								fwlogger.W("-- RPC method callback timeout, retry it %s(%d) %d %s --", t.method, seq, t.conn.Identity(), t.conn.Address())
 								if t.retryTimes == 5 { // 重试5次，放弃
 									delete(w.callTasks, seq)
-									bingo.E("-- RPC method callback recall end, retry time is more than 5 %s(%d) %d %s --", t.method, seq, t.conn.Identity(), t.conn.Address())
+									fwlogger.E("-- RPC method callback recall end, retry time is more than 5 %s(%d) %d %s --", t.method, seq, t.conn.Identity(), t.conn.Address())
 								} else {
 									t.t = 0
 									// recall
@@ -61,13 +61,13 @@ func (w *callSyncWorker) waitingResult(t *callTask) {
 
 func (w *callSyncWorker) receiveResult(callSeq utils.Identity, result *Result) {
 	if w.callTasks == nil {
-		bingo.E("-- RPC callSyncWorker.callTask not init --")
+		fwlogger.E("-- RPC callSyncWorker.callTask not init --")
 		return
 	}
 	if t, ok := w.callTasks[callSeq]; ok {
 		t.c(result)
 		delete(w.callTasks, callSeq)
 	} else {
-		bingo.W("-- RPC method callback ignored, no found call task for %d --", callSeq)
+		fwlogger.W("-- RPC method callback ignored, no found call task for %d --", callSeq)
 	}
 }

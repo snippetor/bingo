@@ -6,28 +6,38 @@ import (
 	"github.com/snippetor/bingo"
 )
 
-var (
-	defaultCodec           codec.ICodec
-	defaultProtoCollection IProtoCollection
-)
-
-func init() {
-	defaultCodec = codec.NewCodec(codec.Protobuf)
-	defaultProtoCollection = IProtoCollection(&DefaultProtoCollection{})
+type MessageProtocol struct {
+	c codec.ICodec
+	p IProtoCollection
 }
 
-func SetDefaultCodec(c codec.ICodec) {
-	defaultCodec = c
+func NewMessageProtocol(c codec.CodecType) *MessageProtocol {
+	p := &MessageProtocol{}
+	p.c = codec.NewCodec(c)
+	p.p = IProtoCollection(&DefaultProtoCollection{})
+	return p
 }
 
-func SetDefaultProtoCollection(c IProtoCollection) {
-	defaultProtoCollection = c
+func (mp *MessageProtocol) SetCodec(c codec.ICodec) {
+	mp.c = c
+}
+
+func (mp *MessageProtocol) GetCodec() codec.ICodec {
+	return mp.c
+}
+
+func (mp *MessageProtocol) SetProtoCollection(c IProtoCollection) {
+	mp.p = c
+}
+
+func (mp *MessageProtocol) GetProtoCollection() IProtoCollection {
+	return mp.p
 }
 
 // 根据默认协议将消息结构体转换为[]byte
 // 注意：此方法要传入指针
-func Marshal(v interface{}) (net.MessageBody, bool) {
-	if b, err := defaultCodec.Marshal(v); err == nil {
+func (mp *MessageProtocol) Marshal(v interface{}) (net.MessageBody, bool) {
+	if b, err := mp.c.Marshal(v); err == nil {
 		return b, true
 	}
 	bingo.E("-- proto Marshal message failed! --")
@@ -37,15 +47,27 @@ func Marshal(v interface{}) (net.MessageBody, bool) {
 // 尝试使用注册的消息ID和结构体对来解析消息体，如果解析无误将返回对应的消息结构体
 // 注意：此方法返回的是消息结构体的指针，而非值
 // @protoVersion 客服端传过来的协议版本
-func UnmarshalTo(msgId net.MessageId, data net.MessageBody, clientProtoVersion string) (interface{}, bool) {
-	if v, ok := defaultProtoCollection.Get(msgId, clientProtoVersion); ok {
-		if err := defaultCodec.Unmarshal(data, v); err != nil {
+func (mp *MessageProtocol) UnmarshalTo(msgId net.MessageId, data net.MessageBody, clientProtoVersion string) (interface{}, bool) {
+	if v, ok := mp.p.Get(msgId, clientProtoVersion); ok {
+		if err := mp.c.Unmarshal(data, v); err != nil {
 			bingo.E("-- proto UnmarshalTo message failed! --")
 			return nil, false
 		}
 		return v, true
-	} else if v, ok := defaultProtoCollection.GetDefault(msgId); ok {
-		if err := defaultCodec.Unmarshal(data, v); err != nil {
+	} else if v, ok := mp.p.GetDefault(msgId); ok {
+		if err := mp.c.Unmarshal(data, v); err != nil {
+			bingo.E("-- proto UnmarshalTo message failed! --")
+			return nil, false
+		}
+		return v, true
+	}
+	bingo.E("-- proto UnmarshalTo message failed! no found message struct for msgid #%d --", int(msgId))
+	return nil, false
+}
+
+func (mp *MessageProtocol) UnmarshalToDefault(msgId net.MessageId, data net.MessageBody) (interface{}, bool) {
+	if v, ok := mp.p.GetDefault(msgId); ok {
+		if err := mp.c.Unmarshal(data, v); err != nil {
 			bingo.E("-- proto UnmarshalTo message failed! --")
 			return nil, false
 		}
@@ -56,8 +78,8 @@ func UnmarshalTo(msgId net.MessageId, data net.MessageBody, clientProtoVersion s
 }
 
 // 直接解析成结构体
-func Unmarshal(data net.MessageBody, v interface{}) bool {
-	if err := defaultCodec.Unmarshal(data, v); err != nil {
+func (mp *MessageProtocol) Unmarshal(data net.MessageBody, v interface{}) bool {
+	if err := mp.c.Unmarshal(data, v); err != nil {
 		bingo.E("-- proto Unmarshal message failed! --")
 		return false
 	}

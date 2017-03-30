@@ -7,6 +7,9 @@ import (
 	"runtime"
 	"os"
 	"sort"
+	"strings"
+	"github.com/snippetor/bingo/node"
+	"path/filepath"
 )
 
 var (
@@ -39,7 +42,7 @@ func E(format string, v ...interface{}) {
 }
 
 var (
-	node       = flag.String("n", "", "startup which node, with its name")
+	n          = flag.String("n", "", "startup which node, with its name")
 	proc       = flag.Int("p", -1, "cpu core size for runtime.GOMAXPROCS, default is runtime.NumCPU")
 	help       = flag.Bool("h", false, "help")
 	version    = flag.Bool("v", false, "bingo framework version")
@@ -79,7 +82,7 @@ func Run() {
 		fmt.Println(usage)
 		return
 	}
-	cmd := os.Args[1]
+	cmd := strings.ToLower(os.Args[1])
 	config := os.Args[2]
 
 	if sort.SearchStrings(commands, cmd) < 0 {
@@ -94,7 +97,7 @@ func Run() {
 
 	flag.Parse()
 
-	node := *node
+	n := *n
 	proc := *proc
 	help := *help
 	version := *version
@@ -112,6 +115,25 @@ func Run() {
 		runtime.GOMAXPROCS(runtime.NumCPU())
 	} else {
 		runtime.GOMAXPROCS(proc)
+	}
+
+	if filepath.IsAbs(config) {
+		node.Parse(config)
+	} else {
+		if dir, err := os.Getwd(); err == nil {
+			node.Parse(filepath.Join(dir, config))
+		}
+	}
+
+	switch cmd {
+	case "start":
+		if n == "" {
+			node.RunAll()
+		} else {
+			node.Run(n)
+		}
+	case "stop":
+
 	}
 
 	<-endRunning

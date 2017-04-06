@@ -58,13 +58,13 @@ func (a Args) MustGetInt(key string, def int) int {
 }
 
 func (a Args) PutInt32(key string, value int32) {
-	a[key] = strconv.Itoa(value)
+	a[key] = strconv.Itoa(int(value))
 }
 
 func (a Args) GetInt32(key string) (int32, bool) {
 	if v, ok := a[key]; ok {
 		if i, err := strconv.Atoi(v); err == nil {
-			return i, true
+			return int32(i), true
 		}
 	}
 	return 0, false

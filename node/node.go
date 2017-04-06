@@ -22,7 +22,6 @@ import (
 	"strings"
 	"github.com/valyala/fasthttp"
 	"strconv"
-	"github.com/snippetor/bingo/codec"
 	"github.com/snippetor/bingo/log/fwlogger"
 )
 

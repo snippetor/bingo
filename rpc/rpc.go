@@ -67,7 +67,7 @@ func (s *Server) Call(endName, method string, args *Args, callback RPCCallback) 
 	if end, ok := s.end[endName]; ok {
 		if conn, ok := s.serv.GetConnection(end.connId); ok {
 			seq := s.identifier.GenIdentity()
-			if body, err := defaultCodec.Marshal(&RPCMethodCall{CallSeq: int32(seq), Method: method, Args: args}); err == nil {
+			if body, err := defaultCodec.Marshal(&RPCMethodCall{CallSeq: int32(seq), Method: method, Args: *args}); err == nil {
 				if !conn.Send(net.MessageId(RPC_MSGID_CALL), body) {
 					fwlogger.E("-- call rpc method %s failed! send message failed --", method)
 				} else {
@@ -96,7 +96,7 @@ func (s *Server) CallNoReturn(endName, method string, args *Args) bool {
 	defer s.l.RUnlock()
 	if end, ok := s.end[endName]; ok {
 		if conn, ok := s.serv.GetConnection(end.connId); ok {
-			if body, err := defaultCodec.Marshal(&RPCMethodCall{CallSeq: int32(s.identifier.GenIdentity()), Method: method, Args: args}); err == nil {
+			if body, err := defaultCodec.Marshal(&RPCMethodCall{CallSeq: int32(s.identifier.GenIdentity()), Method: method, Args: *args}); err == nil {
 				if !conn.Send(net.MessageId(RPC_MSGID_CALL), body) {
 					fwlogger.E("-- call rpc noreturn method %s failed! send message failed --", method)
 				} else {
@@ -228,7 +228,7 @@ func (c *Client) Call(method string, args *Args, callback RPCCallback) bool {
 	c.l.RLock()
 	defer c.l.RUnlock()
 	seq := c.identifier.GenIdentity()
-	if body, err := defaultCodec.Marshal(&RPCMethodCall{CallSeq: int32(seq), Method: method, Args: args}); err == nil {
+	if body, err := defaultCodec.Marshal(&RPCMethodCall{CallSeq: int32(seq), Method: method, Args: *args}); err == nil {
 		if !c.conn.Send(net.MessageId(RPC_MSGID_CALL), body) {
 			fwlogger.E("-- call rpc method %s failed! send message failed --", method)
 		} else {
@@ -248,7 +248,7 @@ func (c *Client) CallNoReturn(method string, args *Args) bool {
 	}
 	c.l.RLock()
 	defer c.l.RUnlock()
-	if body, err := defaultCodec.Marshal(&RPCMethodCall{CallSeq: int32(c.identifier.GenIdentity()), Method: method, Args: args}); err == nil {
+	if body, err := defaultCodec.Marshal(&RPCMethodCall{CallSeq: int32(c.identifier.GenIdentity()), Method: method, Args: *args}); err == nil {
 		if !c.conn.Send(net.MessageId(RPC_MSGID_CALL), body) {
 			fwlogger.E("-- call rpc method %s failed! send message failed --", method)
 		} else {

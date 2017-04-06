@@ -71,39 +71,49 @@ func run_node(n *Node) {
 		fwlogger.E("-- not found model by name %s --", n.ModelName)
 		return
 	}
-	m.SetNodeName(n.Name)
-	m.SetDefaultMessageProtocol(codec.Protobuf)
-	m.SetClientProtoVersion("1.0")
-	m.OnInit()
+	m.setNodeName(n.Name)
+	m.init()
 	// rpc
 	if n.RpcPort > 0 {
 		s := &rpc.Server{}
 		s.Listen(n.Name, n.RpcPort)
-		m.SetRPCServer(s)
+		m.setRPCServer(s)
 	}
 	for _, rpcServerNode := range n.RpcTo {
 		c := &rpc.Client{}
 		serverNode := findNode(rpcServerNode)
-		c.Connect(n.Name, config.Domains[serverNode.Domain]+":"+strconv.Itoa(serverNode.RpcPort))
-		m.PutRPCClient(n.Name, c)
+		if serverNode != nil {
+			c.Connect(n.Name, config.Domains[serverNode.Domain]+":"+strconv.Itoa(serverNode.RpcPort))
+			m.putRPCClient(serverNode.Name, c)
+		}
 	}
 	// service
 	for _, s := range n.Services {
 		switch strings.ToLower(s.Type) {
 		case "tcp":
 			serv := net.GoListen(net.Tcp, s.Port, func(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
-				if v, ok := m.GetDefaultMessageProtocol().UnmarshalTo(msgId, body, m.GetClientProtoVersion()); ok {
-					m.OnReceiveServiceMessage(conn, msgId, v)
+				switch msgId {
+				case net.MSGID_CONNECT_CONNECTED:
+					m.OnServiceClientConnected(s.Name, conn)
+				case net.MSGID_CONNECT_DISCONNECT:
+					m.OnServiceClientDisconnected(s.Name, conn)
+				default:
+					m.OnReceiveServiceMessage(conn, msgId, body)
 				}
 			})
-			m.PutService(s.Name, serv)
+			m.putService(s.Name, serv)
 		case "ws":
 			serv := net.GoListen(net.WebSocket, s.Port, func(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
-				if v, ok := m.GetDefaultMessageProtocol().UnmarshalTo(msgId, body, m.GetClientProtoVersion()); ok {
-					m.OnReceiveServiceMessage(conn, msgId, v)
+				switch msgId {
+				case net.MSGID_CONNECT_CONNECTED:
+					m.OnServiceClientConnected(s.Name, conn)
+				case net.MSGID_CONNECT_DISCONNECT:
+					m.OnServiceClientDisconnected(s.Name, conn)
+				default:
+					m.OnReceiveServiceMessage(conn, msgId, body)
 				}
 			})
-			m.PutService(s.Name, serv)
+			m.putService(s.Name, serv)
 		case "http":
 			go func() {
 				if err := fasthttp.ListenAndServe(":"+strconv.Itoa(s.Port), func(ctx *fasthttp.RequestCtx) {

@@ -43,6 +43,26 @@ func (a Args) MustGetInt(key string, def int) int {
 	return def
 }
 
+func (a Args) PutInt32(key string, value int32) {
+	a[key] = strconv.Itoa(value)
+}
+
+func (a Args) GetInt32(key string) (int32, bool) {
+	if v, ok := a[key]; ok {
+		if i, err := strconv.Atoi(v); err == nil {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
+func (a Args) MustGetInt32(key string, def int32) int32 {
+	if v, ok := a.GetInt32(key); ok {
+		return v
+	}
+	return def
+}
+
 func (a Args) PutInt64(key string, value int64) {
 	a[key] = strconv.FormatInt(value, 10)
 }
@@ -98,6 +118,24 @@ func (a Args) GetBool(key string) (bool, bool) {
 
 func (a Args) MustGetBool(key string, def bool) bool {
 	if v, ok := a.GetBool(key); ok {
+		return v
+	}
+	return def
+}
+
+func (a Args) PutBytes(key string, value []byte) {
+	a[key] = string(value)
+}
+
+func (a Args) GetBytes(key string) ([]byte, bool) {
+	if v, ok := a[key]; ok {
+		return []byte(v), true
+	}
+	return nil, false
+}
+
+func (a Args) MustGetBytes(key string, def []byte) []byte {
+	if v, ok := a.GetBytes(key); ok {
 		return v
 	}
 	return def

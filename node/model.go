@@ -6,6 +6,7 @@ import (
 	"github.com/valyala/fasthttp"
 	"github.com/snippetor/bingo/proto"
 	"github.com/snippetor/bingo/codec"
+	"strings"
 )
 
 var (
@@ -14,92 +15,54 @@ var (
 
 type IModel interface {
 	OnInit()
-	OnReceiveServiceMessage(net.IConn, net.MessageId, interface{})
+	OnServiceClientConnected(string, net.IConn)
+	OnServiceClientDisconnected(string, net.IConn)
+	OnReceiveServiceMessage(net.IConn, net.MessageId, body net.MessageBody)
 	OnReceiveHttpServiceRequest(*fasthttp.RequestCtx)
-	SetNodeName(string)
-	GetNodeName() string
-	SetRPCServer(*rpc.Server)
-	GetRPCServer() *rpc.Server
-	PutRPCClient(string, *rpc.Client)
-	GetRPCClient(string) (*rpc.Client, bool)
-	PutService(string, net.IServer)
-	GetService(string) (net.IServer, bool)
-	SetDefaultMessageProtocol(codec.CodecType)
-	GetDefaultMessageProtocol() *proto.MessageProtocol
-	SetClientProtoVersion(string)
-	GetClientProtoVersion() string
+
+	init()
+	setNodeName(string)
+	setRPCServer(*rpc.Server)
+	putRPCClient(string, *rpc.Client)
+	putService(string, net.IServer)
 }
 
 // rpc
-// service
-type Model struct {
-	nodeName       string
-	servers        map[string]net.IServer
-	rpcClients     map[string]*rpc.Client
-	rpcServer      *rpc.Server
-	proto          *proto.MessageProtocol
-	clientProtoVer string
+type RPCModule struct {
+	nodeName   string
+	rpcClients map[string]*rpc.Client
+	rpcServer  *rpc.Server
 }
 
-func (m *Model) OnInit() {
-}
-
-func (m *Model) OnReceiveServiceMessage(conn net.IConn, msgId net.MessageId, msgBody interface{}) {
-}
-
-func (m *Model) OnReceiveHttpServiceRequest(ctx *fasthttp.RequestCtx) {
-}
-
-func (m *Model) CallRPCMethod(nodeName string, methodName string, args rpc.Args, callback rpc.RPCCallback) {
+func (m *RPCModule) CallMethod(nodeName string, methodName string, args *rpc.Args, callback rpc.RPCCallback) {
 	if m.rpcServer != nil && m.rpcServer.HasEndName(nodeName) {
 		m.rpcServer.Call(nodeName, methodName, args, callback)
-	}
-	if m.rpcClients != nil {
+	} else if m.rpcClients != nil {
 		if c, ok := m.rpcClients[nodeName]; ok && c != nil {
 			c.Call(methodName, args, callback)
 		}
 	}
 }
 
-func (m *Model) CallRPCMethodNoReturn(nodeName string, methodName string, args rpc.Args) {
+func (m *RPCModule) CallMethodNoReturn(nodeName string, methodName string, args *rpc.Args) {
 	if m.rpcServer != nil && m.rpcServer.HasEndName(nodeName) {
 		m.rpcServer.CallNoReturn(nodeName, methodName, args)
-	}
-	if m.rpcClients != nil {
+	} else if m.rpcClients != nil {
 		if c, ok := m.rpcClients[nodeName]; ok && c != nil {
 			c.CallNoReturn(methodName, args)
 		}
 	}
 }
 
-func (m *Model) RegisterRPCMethod(methodName string, method rpc.RPCMethod) {
+func (m *RPCModule) RegisterMethod(methodName string, method rpc.RPCMethod) {
 	rpc.RegisterMethod(m.nodeName, methodName, method)
 }
 
-func (m *Model) SetNodeName(name string) {
-	m.nodeName = name
-}
-
-func (m *Model) GetNodeName() string {
-	return m.nodeName
-}
-
-func (m *Model) SetRPCServer(serv *rpc.Server) {
-	m.rpcServer = serv
-}
-
-func (m *Model) GetRPCServer() *rpc.Server {
+func (m *RPCModule) GetServer() *rpc.Server {
 	return m.rpcServer
 }
 
-func (m *Model) PutRPCClient(name string, client *rpc.Client) {
-	if m.rpcClients == nil {
-		m.rpcClients = make(map[string]*rpc.Client)
-	}
-	m.rpcClients[name] = client
-}
-
-func (m *Model) GetRPCClient(name string) (*rpc.Client, bool) {
+func (m *RPCModule) GetClient(name string) (*rpc.Client, bool) {
 	if m.rpcClients != nil {
 		if c, ok := m.rpcClients[name]; ok {
 			return c, ok
@@ -108,14 +71,24 @@ func (m *Model) GetRPCClient(name string) (*rpc.Client, bool) {
 	return nil, false
 }
 
-func (m *Model) PutService(name string, s net.IServer) {
-	if m.servers == nil {
-		m.servers = make(map[string]net.IServer)
+func (m *RPCModule) GetClientsWithPrefix(nodeNamePrefix string) []*rpc.Client {
+	clients := make([]*rpc.Client, 0)
+	if m.rpcClients != nil {
+		for n, c := range m.rpcClients {
+			if strings.HasPrefix(n, nodeNamePrefix) {
+				clients = append(clients, c)
+			}
+		}
 	}
-	m.servers[name] = s
+	return clients
 }
 
-func (m *Model) GetService(name string) (net.IServer, bool) {
+// service
+type ServiceModule struct {
+	servers map[string]net.IServer
+}
+
+func (m *ServiceModule) GetService(name string) (net.IServer, bool) {
 	if m.servers != nil {
 		if c, ok := m.servers[name]; ok {
 			return c, ok
@@ -124,20 +97,109 @@ func (m *Model) GetService(name string) (net.IServer, bool) {
 	return nil, false
 }
 
-func (m *Model) SetDefaultMessageProtocol(c codec.CodecType) {
+// proto
+type ProtoModule struct {
+	proto          *proto.MessageProtocol
+	clientProtoVer string
+}
+
+func (m *ProtoModule) SetDefaultMessageProtocol(c codec.CodecType) {
 	m.proto = proto.NewMessageProtocol(c)
 }
 
-func (m *Model) GetDefaultMessageProtocol() *proto.MessageProtocol {
+func (m *ProtoModule) GetDefaultMessageProtocol() *proto.MessageProtocol {
 	return m.proto
 }
 
-func (m *Model) SetClientProtoVersion(version string) {
+func (m *ProtoModule) SetClientProtoVersion(version string) {
 	m.clientProtoVer = version
 }
 
-func (m *Model) GetClientProtoVersion() string {
+func (m *ProtoModule) GetClientProtoVersion() string {
 	return m.clientProtoVer
+}
+
+func (m *ProtoModule) RegisterProto(msgId net.MessageId, v interface{}, protoVersion string) {
+	m.proto.GetProtoCollection().Put(msgId, v, protoVersion)
+}
+
+func (m *ProtoModule) RegisterProtoDefault(msgId net.MessageId, v interface{}) {
+	m.proto.GetProtoCollection().PutDefault(msgId, v)
+}
+
+func (m *ProtoModule) Marshal(v interface{}) (net.MessageBody, bool) {
+	return m.proto.Marshal(v)
+}
+
+func (m *ProtoModule) Unmarshal(data net.MessageBody, v interface{}) bool {
+	return m.proto.Unmarshal(data, v)
+}
+
+func (m *ProtoModule) UnmarshalTo(msgId net.MessageId, data net.MessageBody, clientProtoVersion string) (interface{}, bool) {
+	return m.proto.UnmarshalTo(msgId, data, clientProtoVersion)
+}
+
+func (m *ProtoModule) UnmarshalToDefault(msgId net.MessageId, data net.MessageBody) (interface{}, bool) {
+	return m.proto.UnmarshalToDefault(msgId, data)
+}
+
+// model
+type Model struct {
+	nodeName string
+	RPC      *RPCModule
+	Service  *ServiceModule
+	Proto    *ProtoModule
+}
+
+func (m *Model) init() {
+	// init RPC module
+	m.RPC = &RPCModule{nodeName: m.nodeName}
+	// init Service module
+	m.Service = &ServiceModule{}
+	// init Proto module
+	m.Proto = &ProtoModule{proto: proto.NewMessageProtocol(codec.Protobuf), clientProtoVer: ""}
+	m.OnInit()
+}
+
+func (m *Model) setNodeName(name string) {
+	m.nodeName = name
+}
+
+func (m *Model) putService(name string, s net.IServer) {
+	if m.Service.servers == nil {
+		m.Service.servers = make(map[string]net.IServer)
+	}
+	m.Service.servers[name] = s
+}
+
+func (m *Model) setRPCServer(serv *rpc.Server) {
+	m.RPC.rpcServer = serv
+}
+
+func (m *Model) putRPCClient(name string, client *rpc.Client) {
+	if m.RPC.rpcClients == nil {
+		m.RPC.rpcClients = make(map[string]*rpc.Client)
+	}
+	m.RPC.rpcClients[name] = client
+}
+
+func (m *Model) OnInit() {
+}
+
+func (m *Model) OnServiceClientConnected(serviceName string, conn net.IConn) {
+}
+
+func (m *Model) OnServiceClientDisconnected(serviceName string, conn net.IConn) {
+}
+
+func (m *Model) OnReceiveServiceMessage(conn net.IConn, msgId net.MessageId, msgBody net.MessageBody) {
+}
+
+func (m *Model) OnReceiveHttpServiceRequest(ctx *fasthttp.RequestCtx) {
+}
+
+func (m *Model) GetNodeName() string {
+	return m.nodeName
 }
 
 func BindNodeModel(modelName string, m IModel) {

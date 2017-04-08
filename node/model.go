@@ -29,6 +29,7 @@ var (
 
 type IModel interface {
 	OnInit()
+	OnDestroy()
 	OnServiceClientConnected(string, net.IConn)
 	OnServiceClientDisconnected(string, net.IConn)
 	OnReceiveServiceMessage(net.IConn, net.MessageId, body net.MessageBody)
@@ -39,6 +40,7 @@ type IModel interface {
 	setRPCServer(*rpc.Server)
 	putRPCClient(string, *rpc.Client)
 	putService(string, net.IServer)
+	destroy()
 }
 
 // rpc
@@ -97,6 +99,19 @@ func (m *RPCModule) GetClientsWithPrefix(nodeNamePrefix string) []*rpc.Client {
 	return clients
 }
 
+func (m *RPCModule) Close() {
+	if m.rpcServer != nil {
+		m.rpcServer.Close()
+	}
+	if m.rpcClients != nil {
+		for _, v := range m.rpcClients {
+			if v != nil {
+				v.Close()
+			}
+		}
+	}
+}
+
 // service
 type ServiceModule struct {
 	servers map[string]net.IServer
@@ -109,6 +124,16 @@ func (m *ServiceModule) GetService(name string) (net.IServer, bool) {
 		}
 	}
 	return nil, false
+}
+
+func (m *ServiceModule) Close() {
+	if m.servers != nil {
+		for _, v := range m.servers {
+			if v != nil {
+				v.Close()
+			}
+		}
+	}
 }
 
 // proto
@@ -197,7 +222,15 @@ func (m *Model) putRPCClient(name string, client *rpc.Client) {
 	m.RPC.rpcClients[name] = client
 }
 
+func (m *Model) destroy() {
+	// close RPC
+	m.OnDestroy()
+}
+
 func (m *Model) OnInit() {
+}
+
+func (m *Model) OnDestroy() {
 }
 
 func (m *Model) OnServiceClientConnected(serviceName string, conn net.IConn) {

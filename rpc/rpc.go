@@ -56,6 +56,10 @@ func (s *Server) Listen(endName string, port int) {
 	}
 }
 
+func (s *Server) Close() {
+	s.serv.Close()
+}
+
 func (s *Server) Call(endName, method string, args *Args, callback RPCCallback) bool {
 	fwlogger.D("Call: %s, %s, %s", endName, method, args)
 	if s.serv == nil {
@@ -204,6 +208,7 @@ type Client struct {
 	state      net.ConnState
 	identifier *utils.Identifier
 	callSyncWorker
+	forceClose bool
 }
 
 func (c *Client) Connect(endName, serverAddress string) {
@@ -218,6 +223,11 @@ func (c *Client) Connect(endName, serverAddress string) {
 	} else {
 		c.state = net.STATE_CONNECTED
 	}
+}
+
+func (c *Client) Close() {
+	c.forceClose = true
+	c.conn.Close()
 }
 
 func (c *Client) Call(method string, args *Args, callback RPCCallback) bool {
@@ -275,7 +285,9 @@ func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 	case RPC_MSGID(net.MSGID_CONNECT_DISCONNECT):
 		c.conn = nil
 		c.state = net.STATE_CLOSED
-		c.reconnect()
+		if !c.forceClose {
+			c.reconnect()
+		}
 	case RPC_MSGID_CALL:
 		call := &RPCMethodCall{}
 		if err := defaultCodec.Unmarshal(body, call); err != nil {

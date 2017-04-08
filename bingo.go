@@ -125,8 +125,8 @@ func Run() {
 			node.Run(n)
 		}
 	case "stop":
-
 	}
 
 	<-endRunning
+	node.StopAll()
 }

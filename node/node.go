@@ -150,8 +150,27 @@ func Run(nodeName string) {
 	run_node(n)
 }
 
+func Stop(nodeName string) {
+	n := findNode(nodeName)
+	if n == nil {
+		fwlogger.E("-- stop node failed! not found node by name %s --", nodeName)
+		return
+	}
+	if m, ok := nodes[nodeName]; ok {
+		(*m).destroy()
+	}
+}
+
 func RunAll() {
 	for _, n := range config.Nodes {
 		run_node(n)
+	}
+}
+
+func StopAll() {
+	for _, m := range nodes {
+		if m != nil {
+			(*m).destroy()
+		}
 	}
 }

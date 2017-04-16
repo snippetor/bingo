@@ -90,6 +90,8 @@ type Logger struct {
 	f *os.File
 	// 检查文件monitor是否在运行
 	isMonitorRunning bool
+	// 日志前缀，将写在日期和等级后面，日志内容前面
+	prefixes []string
 }
 
 func NewLogger(configFile string) *Logger {
@@ -175,12 +177,24 @@ func (l *Logger) setConfig(c *Config) {
 	l.startFileCheckMonitor()
 }
 
+func (l *Logger) SetPrefixes(prefix ...string) {
+	l.prefixes = prefix
+}
+
+func (l *Logger) formatPrefixes() string {
+	f := "|"
+	for _, p := range l.prefixes {
+		f = f + p + "|"
+	}
+	return f
+}
+
 func (l *Logger) I(format string, v ...interface{}) {
 	if Info >= l.config.Level {
 		if len(v) == 0 {
-			l.c <- "[I] " + format
+			l.c <- "[I] " + l.formatPrefixes() + format
 		} else {
-			l.c <- "[I] " + fmt.Sprintf(format, v...)
+			l.c <- "[I] " + l.formatPrefixes() + fmt.Sprintf(format, v...)
 		}
 	}
 }
@@ -188,9 +202,9 @@ func (l *Logger) I(format string, v ...interface{}) {
 func (l *Logger) D(format string, v ...interface{}) {
 	if Debug >= l.config.Level {
 		if len(v) == 0 {
-			l.c <- "[D] " + format
+			l.c <- "[D] " + l.formatPrefixes() + format
 		} else {
-			l.c <- "[D] " + fmt.Sprintf(format, v...)
+			l.c <- "[D] " + l.formatPrefixes() + fmt.Sprintf(format, v...)
 		}
 	}
 }
@@ -198,9 +212,9 @@ func (l *Logger) D(format string, v ...interface{}) {
 func (l *Logger) W(format string, v ...interface{}) {
 	if Warning >= l.config.Level {
 		if len(v) == 0 {
-			l.c <- "[W] " + format
+			l.c <- "[W] " + l.formatPrefixes() + format
 		} else {
-			l.c <- "[W] " + fmt.Sprintf(format, v...)
+			l.c <- "[W] " + l.formatPrefixes() + fmt.Sprintf(format, v...)
 		}
 	}
 }
@@ -208,9 +222,9 @@ func (l *Logger) W(format string, v ...interface{}) {
 func (l *Logger) E(format string, v ...interface{}) {
 	if Error >= l.config.Level {
 		if len(v) == 0 {
-			l.c <- "[E] " + format
+			l.c <- "[E] " + l.formatPrefixes() + format
 		} else {
-			l.c <- "[E] " + fmt.Sprintf(format, v...)
+			l.c <- "[E] " + l.formatPrefixes() + fmt.Sprintf(format, v...)
 		}
 	}
 }

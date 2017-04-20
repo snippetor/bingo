@@ -94,13 +94,7 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 		}
 		ctx := &Context{conn: conn, Method: call.Method, Args: call.Args}
 		r := callMethod(s.endName, call.Method, ctx)
-		var rets map[string]string
-		if r == nil {
-			rets = make(map[string]string)
-		} else {
-			rets = r.Args
-		}
-		if body, err := defaultCodec.Marshal(&RPCMethodReturn{CallSeq: call.CallSeq, Method: call.Method, Returns: rets}); err == nil {
+		if body, err := defaultCodec.Marshal(&RPCMethodReturn{CallSeq: call.CallSeq, Method: call.Method, Returns: r.Args}); err == nil {
 			if !conn.Send(net.MessageId(RPC_MSGID_RETURN), body) {
 				fwlogger.E("-- return rpc method %s failed! send message failed --", call.Method)
 			}
@@ -232,13 +226,7 @@ func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 		}
 		ctx := &Context{conn: conn, Method: call.Method, Args: call.Args}
 		r := callMethod(c.endName, call.Method, ctx)
-		var rets map[string]string
-		if r == nil {
-			rets = make(map[string]string)
-		} else {
-			rets = r.Args
-		}
-		if body, err := defaultCodec.Marshal(&RPCMethodReturn{CallSeq: call.CallSeq, Method: call.Method, Returns: rets}); err == nil {
+		if body, err := defaultCodec.Marshal(&RPCMethodReturn{CallSeq: call.CallSeq, Method: call.Method, Returns: r.Args}); err == nil {
 			if !conn.Send(net.MessageId(RPC_MSGID_RETURN), body) {
 				fwlogger.E("-- return rpc method %s failed! send message failed --", call.Method)
 			}

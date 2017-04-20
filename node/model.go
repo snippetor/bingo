@@ -50,53 +50,55 @@ type RPCModule struct {
 	rpcServer  *rpc.Server
 }
 
-func (m *RPCModule) CallMethod(nodeName string, methodName string, args *rpc.Args, callback rpc.RPCCallback) {
-	if m.rpcServer != nil && m.rpcServer.HasEndName(nodeName) {
-		m.rpcServer.Call(nodeName, methodName, args, callback)
-	} else if m.rpcClients != nil {
-		if c, ok := m.rpcClients[nodeName]; ok && c != nil {
-			c.Call(methodName, args, callback)
-		}
-	}
-}
-
-func (m *RPCModule) CallMethodNoReturn(nodeName string, methodName string, args *rpc.Args) {
-	if m.rpcServer != nil && m.rpcServer.HasEndName(nodeName) {
-		m.rpcServer.CallNoReturn(nodeName, methodName, args)
-	} else if m.rpcClients != nil {
-		if c, ok := m.rpcClients[nodeName]; ok && c != nil {
-			c.CallNoReturn(methodName, args)
-		}
-	}
-}
-
 func (m *RPCModule) RegisterMethod(methodName string, method rpc.RPCMethod) {
 	rpc.RegisterMethod(m.nodeName, methodName, method)
 }
 
-func (m *RPCModule) GetServer() *rpc.Server {
-	return m.rpcServer
-}
-
-func (m *RPCModule) GetClient(name string) (*rpc.Client, bool) {
-	if m.rpcClients != nil {
-		if c, ok := m.rpcClients[name]; ok {
-			return c, ok
+func (m *RPCModule) GetEndStub(nodeName string) (rpc.IEndStub, bool) {
+	if m.rpcServer != nil {
+		if c, ok := m.rpcServer.GetClient(nodeName); ok {
+			return rpc.IEndStub(c), true
+		}
+	}
+	if m.rpcClients != nil && len(m.rpcClients) > 0 {
+		if c, ok := m.rpcClients[nodeName]; ok {
+			return rpc.IEndStub(c), true
 		}
 	}
 	return nil, false
 }
 
-func (m *RPCModule) GetClientsWithPrefix(nodeNamePrefix string) []*rpc.Client {
-	clients := make([]*rpc.Client, 0)
-	if m.rpcClients != nil {
-		for n, c := range m.rpcClients {
+func (m *RPCModule) GetEndStubsWithPrefix(nodeNamePrefix string) []rpc.IEndStub {
+	stubs := make([]rpc.IEndStub, 0)
+	if m.rpcServer != nil {
+		for n, c := range *m.rpcServer.GetClients() {
 			if strings.HasPrefix(n, nodeNamePrefix) {
-				clients = append(clients, c)
+				stubs = append(stubs, rpc.IEndStub(c))
 			}
 		}
 	}
-	return clients
+	if m.rpcClients != nil {
+		for n, c := range m.rpcClients {
+			if strings.HasPrefix(n, nodeNamePrefix) {
+				stubs = append(stubs, rpc.IEndStub(c))
+			}
+		}
+	}
+	return stubs
+}
+
+// 通过名称前缀和平衡因子获取stub
+// 如果有多个stub，则通过取模算法（balancingSeed % (stubs size)）来决定使用哪个
+func (m *RPCModule) GetEndStubWithPrefixAndBalancingSeed(nodeNamePrefix string, balancingSeed int64) (rpc.IEndStub, bool) {
+	stubs := m.GetEndStubsWithPrefix(nodeNamePrefix)
+	len := len(stubs)
+	if len == 0 {
+		return nil, false
+	} else if len == 1 {
+		return stubs[0], true
+	} else {
+		return stubs[balancingSeed%int64(len)], true
+	}
 }
 
 func (m *RPCModule) Close() {

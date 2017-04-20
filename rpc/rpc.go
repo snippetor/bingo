@@ -21,7 +21,6 @@ import (
 	"time"
 	"github.com/snippetor/bingo/utils"
 	"github.com/snippetor/bingo/log/fwlogger"
-	"strings"
 )
 
 var (
@@ -32,15 +31,15 @@ func init() {
 	defaultCodec = codec.NewCodec(codec.Protobuf)
 }
 
-type RPCEnd struct {
-	connId utils.Identity
-	name   string
+type IEndStub interface {
+	Call(method string, args *Args, callback RPCCallback) bool
+	CallNoReturn(method string, args *Args) bool
 }
 
 type Server struct {
 	endName    string
 	serv       net.IServer
-	end        map[string]*RPCEnd
+	clients    map[string]*Client
 	l          *sync.RWMutex
 	identifier *utils.Identifier
 	callSyncWorker
@@ -49,7 +48,7 @@ type Server struct {
 func (s *Server) Listen(endName string, port int) {
 	s.endName = endName
 	s.l = &sync.RWMutex{}
-	s.end = make(map[string]*RPCEnd)
+	s.clients = make(map[string]*Client)
 	s.identifier = utils.NewIdentifier(2)
 	if s.serv = net.GoListen(net.Tcp, port, s.handleMessage); s.serv == nil {
 		fwlogger.E("-- start rpc server failed! --")
@@ -60,71 +59,13 @@ func (s *Server) Close() {
 	s.serv.Close()
 }
 
-func (s *Server) Call(endName, method string, args *Args, callback RPCCallback) bool {
-	fwlogger.D("Call: %s, %s, %s", endName, method, args)
-	if s.serv == nil {
-		fwlogger.E("-- call rpc method %s failed! rpc server no startup --", method)
-		return false
-	}
-	s.l.RLock()
-	defer s.l.RUnlock()
-	if end, ok := s.end[endName]; ok {
-		if conn, ok := s.serv.GetConnection(end.connId); ok {
-			seq := s.identifier.GenIdentity()
-			if body, err := defaultCodec.Marshal(&RPCMethodCall{CallSeq: int32(seq), Method: method, Args: *args}); err == nil {
-				if !conn.Send(net.MessageId(RPC_MSGID_CALL), body) {
-					fwlogger.E("-- call rpc method %s failed! send message failed --", method)
-				} else {
-					s.waitingResult(&callTask{seq: seq, conn: conn, msg: body, c: callback, t: time.Now().UnixNano()})
-					return true
-				}
-			} else {
-				fwlogger.E("-- call rpc method %s failed! marshal message failed --", method)
-			}
-		} else {
-			fwlogger.E("-- call rpc method %s failed! no connection for call --", method)
-		}
-	} else {
-		fwlogger.E("-- call rpc method failed! no end connected with name is %s --", endName)
-	}
-	return false
-}
-
-func (s *Server) CallNoReturn(endName, method string, args *Args) bool {
-	fwlogger.D("CallNoReturn: %s, %s, %s", endName, method, args)
-	if s.serv == nil {
-		fwlogger.E("-- call rpc noreturn method %s failed! rpc server no startup --", method)
-		return false
-	}
-	s.l.RLock()
-	defer s.l.RUnlock()
-	if end, ok := s.end[endName]; ok {
-		if conn, ok := s.serv.GetConnection(end.connId); ok {
-			if body, err := defaultCodec.Marshal(&RPCMethodCall{CallSeq: int32(s.identifier.GenIdentity()), Method: method, Args: *args}); err == nil {
-				if !conn.Send(net.MessageId(RPC_MSGID_CALL), body) {
-					fwlogger.E("-- call rpc noreturn method %s failed! send message failed --", method)
-				} else {
-					return true
-				}
-			} else {
-				fwlogger.E("-- call rpc noreturn method %s failed! marshal message failed --", method)
-			}
-		} else {
-			fwlogger.E("-- call rpc noreturn method %s failed! no connection for call --", method)
-		}
-	} else {
-		fwlogger.E("-- call rpc noreturn method failed! no end connected with name is %s --", endName)
-	}
-	return false
-}
-
 func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
 	switch RPC_MSGID(msgId) {
 	case net.MSGID_CONNECT_DISCONNECT:
-		for name, e := range s.end {
-			if e.connId == conn.Identity() {
+		for name, c := range s.clients {
+			if c.conn.Identity() == conn.Identity() {
 				s.l.Lock()
-				delete(s.end, name)
+				delete(s.clients, name)
 				s.l.Unlock()
 				break
 			}
@@ -135,9 +76,15 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 			fwlogger.E("-- RPC handshake failed! -- ")
 			return
 		}
-		end := &RPCEnd{connId: conn.Identity(), name: handshake.EndName}
+		c := &Client{}
+		c.conn = conn
+		c.endName = handshake.EndName
+		c.state = net.STATE_CONNECTED
+		c.addr = conn.Address()
+		c.identifier = utils.NewIdentifier(3)
+		c.l = &sync.RWMutex{}
 		s.l.Lock()
-		s.end[handshake.EndName] = end
+		s.clients[handshake.EndName] = c
 		s.l.Unlock()
 	case RPC_MSGID_CALL:
 		call := &RPCMethodCall{}
@@ -180,24 +127,13 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 	}
 }
 
-func (s *Server) HasEndName(endName string) bool {
-	if s.end == nil {
-		return false
-	}
-	if _, ok := s.end[endName]; ok {
-		return true
-	}
-	return false
+func (s *Server) GetClients() *map[string]*Client {
+	return &s.clients
 }
 
-func (s *Server) GetEndNamesWithPrefix(endNamePrefix string) []string {
-	names := make([]string, 0)
-	for name := range s.end {
-		if strings.HasPrefix(name, endNamePrefix) {
-			names = append(names, name)
-		}
-	}
-	return names
+func (s *Server) GetClient(name string) (*Client, bool) {
+	c, ok := s.clients[name]
+	return c, ok
 }
 
 type Client struct {

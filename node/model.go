@@ -32,7 +32,7 @@ type IModel interface {
 	OnDestroy()
 	OnServiceClientConnected(string, net.IConn)
 	OnServiceClientDisconnected(string, net.IConn)
-	OnReceiveServiceMessage(net.IConn, net.MessageId, body net.MessageBody)
+	OnReceiveServiceMessage(net.IConn, net.MessageId, net.MessageBody)
 	OnReceiveHttpServiceRequest(*fasthttp.RequestCtx)
 
 	init()

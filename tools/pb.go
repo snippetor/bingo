@@ -16,7 +16,7 @@ func main() {
 			return
 		}
 		dir := filepath.Dir(protofile)
-		err := exec.Command("protoc", "--gogofaster_out="+dir, "--proto_path="+dir, protofile).Run()
+		err := exec.Command("./protoc", "--gogofaster_out="+dir, "--proto_path="+dir, protofile).Run()
 		if err != nil {
 			fmt.Println(err)
 		}

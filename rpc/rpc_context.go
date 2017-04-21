@@ -156,7 +156,8 @@ func (a Args) MustGetBytes(key string, def []byte) []byte {
 }
 
 type Context struct {
-	conn   net.IConn
-	Method string
+	RemoteNodeName string
+	conn           net.IConn
+	Method         string
 	Args
 }

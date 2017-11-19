@@ -17,6 +17,7 @@ package rpc
 import (
 	"github.com/snippetor/bingo/net"
 	"strconv"
+	"github.com/snippetor/bingo/log/fwlogger"
 )
 
 type Args map[string]string
@@ -156,8 +157,29 @@ func (a Args) MustGetBytes(key string, def []byte) []byte {
 }
 
 type Context struct {
+	callSeq        int32
 	RemoteNodeName string
 	conn           net.IConn
 	Method         string
 	Args
+}
+
+func (c *Context) Return(r *Result) {
+	if body, err := defaultCodec.Marshal(&RPCMethodReturn{CallSeq: c.callSeq, Method: c.Method, Returns: r.Args}); err == nil {
+		if !c.conn.Send(net.MessageId(RPC_MSGID_RETURN), body) {
+			fwlogger.E("-- return rpc method %s failed! send message failed --", c.Method)
+		}
+	} else {
+		fwlogger.E("-- return rpc method %s failed! marshal message failed --", c.Method)
+	}
+}
+
+func (c *Context) ReturnNil() {
+	if body, err := defaultCodec.Marshal(&RPCMethodReturn{CallSeq: c.callSeq, Method: c.Method, Returns: nil}); err == nil {
+		if !c.conn.Send(net.MessageId(RPC_MSGID_RETURN), body) {
+			fwlogger.E("-- return rpc method %s failed! send message failed --", c.Method)
+		}
+	} else {
+		fwlogger.E("-- return rpc method %s failed! marshal message failed --", c.Method)
+	}
 }

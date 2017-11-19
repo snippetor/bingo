@@ -18,7 +18,7 @@ type Result struct {
 	Args
 }
 
-type RPCMethod func(*Context) *Result
+type RPCMethod func(*Context)
 type RPCCallback func(*Result)
 
 var (
@@ -33,11 +33,10 @@ func RegisterMethod(target, methodName string, f RPCMethod) {
 	methods[makeKey(target, methodName)] = f
 }
 
-func callMethod(target, methodName string, ctx *Context) *Result {
+func callMethod(target, methodName string, ctx *Context) {
 	if v, ok := methods[makeKey(target, methodName)]; ok {
-		return v(ctx)
+		v(ctx)
 	}
-	return nil
 }
 
 func makeKey(target, methodName string) string {

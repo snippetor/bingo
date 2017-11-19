@@ -89,26 +89,11 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 	case RPC_MSGID_CALL:
 		call := &RPCMethodCall{}
 		if err := defaultCodec.Unmarshal(body, call); err != nil {
-			fwlogger.E("-- RPC call failed! -- ")
-			return
-		}
-		ctx := &Context{conn: conn, Method: call.Method, Args: call.Args}
-		r := callMethod(s.endName, call.Method, ctx)
-		if body, err := defaultCodec.Marshal(&RPCMethodReturn{CallSeq: call.CallSeq, Method: call.Method, Returns: r.Args}); err == nil {
-			if !conn.Send(net.MessageId(RPC_MSGID_RETURN), body) {
-				fwlogger.E("-- return rpc method %s failed! send message failed --", call.Method)
-			}
-		} else {
-			fwlogger.E("-- return rpc method %s failed! marshal message failed --", call.Method)
-		}
-	case RPC_MSGID_CALL_NORETURN:
-		call := &RPCMethodCall{}
-		if err := defaultCodec.Unmarshal(body, call); err != nil {
 			fwlogger.E("-- RPC noreturn call failed! -- ")
 			return
 		}
 		fwlogger.D("@call noreturn method %s(%d) with args %s", call.Method, call.CallSeq, call.Args)
-		ctx := &Context{conn: conn, Method: call.Method, Args: call.Args}
+		ctx := &Context{conn: conn, callSeq: call.CallSeq, Method: call.Method, Args: call.Args}
 		callMethod(s.endName, call.Method, ctx)
 	case RPC_MSGID_RETURN:
 		ret := &RPCMethodReturn{}
@@ -221,26 +206,11 @@ func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 	case RPC_MSGID_CALL:
 		call := &RPCMethodCall{}
 		if err := defaultCodec.Unmarshal(body, call); err != nil {
-			fwlogger.E("-- RPC call failed! -- ")
-			return
-		}
-		ctx := &Context{conn: conn, Method: call.Method, Args: call.Args}
-		r := callMethod(c.endName, call.Method, ctx)
-		if body, err := defaultCodec.Marshal(&RPCMethodReturn{CallSeq: call.CallSeq, Method: call.Method, Returns: r.Args}); err == nil {
-			if !conn.Send(net.MessageId(RPC_MSGID_RETURN), body) {
-				fwlogger.E("-- return rpc method %s failed! send message failed --", call.Method)
-			}
-		} else {
-			fwlogger.E("-- return rpc method %s failed! marshal message failed --", call.Method)
-		}
-	case RPC_MSGID_CALL_NORETURN:
-		call := &RPCMethodCall{}
-		if err := defaultCodec.Unmarshal(body, call); err != nil {
 			fwlogger.E("-- RPC noreturn call failed! -- ")
 			return
 		}
-		fwlogger.D("@call noreturn method %s(%d) with args %s", call.Method, call.CallSeq, call.Args)
-		ctx := &Context{conn: conn, Method: call.Method, Args: call.Args}
+		fwlogger.D("@call method %s(%d) with args %s", call.Method, call.CallSeq, call.Args)
+		ctx := &Context{conn: conn, callSeq: call.CallSeq, Method: call.Method, Args: call.Args}
 		callMethod(c.endName, call.Method, ctx)
 	case RPC_MSGID_RETURN:
 		ret := &RPCMethodReturn{}

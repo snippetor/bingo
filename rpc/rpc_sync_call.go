@@ -54,16 +54,13 @@ func (w *callSyncWorker) waitingResult(t *callTask) {
 							delete(w.callTasks, seq)
 						} else {
 							if (now.UnixNano() - t.t) > int64(2*time.Second) { // 两秒超时
-								fwlogger.W("-- RPC method callback timeout, retry it %s(%d) %d %s --", t.method, seq, t.conn.Identity(), t.conn.Address())
-								if t.retryTimes == 5 { // 重试5次，放弃
+								if t, ok := w.callTasks[seq]; ok {
+									t.c(nil) // 返回nil
 									delete(w.callTasks, seq)
-									fwlogger.E("-- RPC method callback recall end, retry time is more than 5 %s(%d) %d %s --", t.method, seq, t.conn.Identity(), t.conn.Address())
 								} else {
-									t.t = 0
-									// recall
-									t.conn.Send(net.MessageId(RPC_MSGID_CALL), t.msg)
-									t.retryTimes++
+									fwlogger.W("-- RPC method callback ignored, no found call task for %d --", seq)
 								}
+								fwlogger.E("-- RPC method callback timeout, %s(%d) %d %s --", t.method, seq, t.conn.Identity(), t.conn.Address())
 							}
 						}
 					}

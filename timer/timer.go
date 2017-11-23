@@ -28,25 +28,42 @@ func (t *DelayCall) call() {
 }
 
 type Timer struct {
-	delay     time.Duration
-	delayCall *DelayCall
+	delay       time.Duration
+	delayCall   *DelayCall
+	isCancelled bool
+	duration    int64
 }
 
-func NewTimer(delay time.Duration, f CallFunc, args []interface{}) *Timer {
+func NewTimer(delay time.Duration, f CallFunc, args ...interface{}) *Timer {
 	return &Timer{
 		delay: delay,
 		delayCall: &DelayCall{
 			f:    f,
 			args: args,
 		},
+		isCancelled: false,
+		duration:    0,
 	}
 }
 
 func (t *Timer) Run() {
 	go func() {
-		time.Sleep(t.delay)
-		t.delayCall.call()
+		for {
+			if t.isCancelled {
+				break
+			}
+			if t.duration >= int64(t.delay) {
+				t.delayCall.call()
+				break
+			}
+			time.Sleep(500)
+			t.duration += 500
+		}
 	}()
+}
+
+func (t *Timer) Cancel() {
+	t.isCancelled = true
 }
 
 func (t *Timer) GetDurations() time.Duration {

@@ -32,7 +32,7 @@ func init() {
 }
 
 type IEndStub interface {
-	Call(method string, args *Args, callback RPCCallback) bool
+	Call(method string, args *Args) (*Result, bool)
 	CallNoReturn(method string, args *Args) bool
 }
 
@@ -145,10 +145,10 @@ func (c *Client) Close() {
 	c.conn.Close()
 }
 
-func (c *Client) Call(method string, args *Args, callback RPCCallback) bool {
+func (c *Client) Call(method string, args *Args) (*Result, bool) {
 	if c.conn == nil {
 		fwlogger.E("-- call rpc method %s failed! rpc client not connect to server --", method)
-		return false
+		return nil, false
 	}
 	c.l.RLock()
 	defer c.l.RUnlock()
@@ -157,13 +157,17 @@ func (c *Client) Call(method string, args *Args, callback RPCCallback) bool {
 		if !c.conn.Send(net.MessageId(RPC_MSGID_CALL), body) {
 			fwlogger.E("-- call rpc method %s failed! send message failed --", method)
 		} else {
-			c.waitingResult(&callTask{seq: seq, conn: c.conn, msg: body, c: callback, t: time.Now().UnixNano()})
-			return true
+			ch := make(chan *Result)
+			c.waitingResult(&callTask{seq: seq, conn: c.conn, msg: body, c: func(result *Result) {
+				ch <- result
+			}, t: time.Now().UnixNano()})
+			res := <-ch
+			return res, true
 		}
 	} else {
 		fwlogger.E("-- call rpc method %s failed! marshal message failed --", method)
 	}
-	return false
+	return nil, false
 }
 
 func (c *Client) CallNoReturn(method string, args *Args) bool {

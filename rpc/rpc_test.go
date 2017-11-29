@@ -4,6 +4,7 @@ import (
 	"testing"
 	"fmt"
 	"github.com/snippetor/bingo/codec"
+	"unsafe"
 )
 
 func TestGenCallSeq(t *testing.T) {
@@ -26,4 +27,9 @@ func TestMap(t *testing.T) {
 		t.Fail()
 	}
 
+	v := RPCValue{I32: 0, S:"test"}
+	fmt.Println(unsafe.Sizeof(v))
+	bytes := make([]byte, v.Size())
+	v.MarshalTo(bytes)
+	fmt.Println(len(bytes))
 }

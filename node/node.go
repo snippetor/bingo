@@ -23,6 +23,7 @@ import (
 	"github.com/valyala/fasthttp"
 	"strconv"
 	"github.com/snippetor/bingo/log/fwlogger"
+	"github.com/snippetor/bingo/utils"
 )
 
 type Service struct {
@@ -34,16 +35,17 @@ type Service struct {
 
 type Node struct {
 	Name      string
-	ModelName string `json:"model"`
+	ModelName string                 `json:"model"`
 	Domain    int
-	Services  []*Service `json:"service"`
-	RpcPort   int        `json:"rpc-port"`
-	RpcTo     []string   `json:"rpc-to"`
+	Services  []*Service             `json:"service"`
+	RpcPort   int                    `json:"rpc-port"`
+	RpcTo     []string               `json:"rpc-to"`
+	Config    map[string]interface{} `json:"config"`
 }
 
 type Config struct {
-	Domains []string   `json:"domains"`
-	Nodes   []*Node    `json:"node"`
+	Domains []string `json:"domains"`
+	Nodes   []*Node  `json:"nodes"`
 }
 
 var (
@@ -85,7 +87,19 @@ func run_node(n *Node) {
 		return
 	}
 	m.setNodeName(n.Name)
+
+	// config
+	vm := &utils.ValueMap{}
+	for k, v := range n.Config {
+		value := &utils.Value{}
+		value.Set(v)
+		vm.Put(k, value)
+	}
+	m.setConfig(vm)
+
+	// init
 	m.init()
+
 	// rpc
 	if n.RpcPort > 0 {
 		s := &rpc.Server{}

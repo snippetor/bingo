@@ -2,7 +2,7 @@
   "domains": [
     "192.168.1.128"
   ],
-  "node": [
+  "nodes": [
     {
       "name": "master",
       "model": "master",
@@ -15,7 +15,7 @@
       "domain": 0,
       "service": [
         {
-          "name":"http8080",
+          "name": "http8080",
           "type": "http",
           "port": 8080
         }
@@ -27,7 +27,7 @@
       "domain": 0,
       "service": [
         {
-          "name":"tcp9090",
+          "name": "tcp9090",
           "type": "tcp",
           "port": 9090,
           "codec": "protobuf"
@@ -36,7 +36,12 @@
       "rpc-port": 9091,
       "rpc-to": [
         "master"
-      ]
+      ],
+      "config": {
+        "dbName":"ddz",
+        "dbPwd":"test",
+        "port":100
+      }
     },
     {
       "name": "game1",

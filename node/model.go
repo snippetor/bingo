@@ -21,6 +21,7 @@ import (
 	"github.com/snippetor/bingo/proto"
 	"github.com/snippetor/bingo/codec"
 	"strings"
+	"github.com/snippetor/bingo/utils"
 )
 
 var (
@@ -40,6 +41,7 @@ type IModel interface {
 	setRPCServer(*rpc.Server)
 	putRPCClient(string, *rpc.Client)
 	putService(string, net.IServer)
+	setConfig(*utils.ValueMap)
 	destroy()
 }
 
@@ -190,6 +192,7 @@ type Model struct {
 	RPC      *RPCModule
 	Service  *ServiceModule
 	Proto    *ProtoModule
+	Config   *utils.ValueMap
 }
 
 func (m *Model) init() {
@@ -222,6 +225,10 @@ func (m *Model) putRPCClient(name string, client *rpc.Client) {
 		m.RPC.rpcClients = make(map[string]*rpc.Client)
 	}
 	m.RPC.rpcClients[name] = client
+}
+
+func (m *Model) setConfig(config *utils.ValueMap) {
+	m.Config = config
 }
 
 func (m *Model) destroy() {

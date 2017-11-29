@@ -93,7 +93,9 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 			return
 		}
 		fwlogger.D("@call noreturn method %s(%d) with args %s", call.Method, call.CallSeq, call.Args)
-		ctx := &Context{conn: conn, callSeq: call.CallSeq, Method: call.Method, Args: call.Args}
+		args := Args{}
+		args.FromRPCMap(&call.Args)
+		ctx := &Context{conn: conn, callSeq: call.CallSeq, Method: call.Method, Args: args}
 		callMethod(s.endName, call.Method, ctx)
 	case RPC_MSGID_RETURN:
 		ret := &RPCMethodReturn{}
@@ -102,7 +104,9 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 			return
 		}
 		fwlogger.D("@receive return from RPC method %s(%d) with result %s", ret.Method, ret.CallSeq, ret.Returns)
-		s.receiveResult(utils.Identity(ret.CallSeq), &Result{Args: ret.Returns})
+		args := Args{}
+		args.FromRPCMap(&ret.Returns)
+		s.receiveResult(utils.Identity(ret.CallSeq), &Result{Args: args})
 	}
 }
 
@@ -153,7 +157,9 @@ func (c *Client) Call(method string, args *Args) (*Result, bool) {
 	c.l.RLock()
 	defer c.l.RUnlock()
 	seq := c.identifier.GenIdentity()
-	if body, err := defaultCodec.Marshal(&RPCMethodCall{CallSeq: int32(seq), Method: method, Args: *args}); err == nil {
+	res := make(map[string]*RPCValue)
+	args.ToRPCMap(&res)
+	if body, err := defaultCodec.Marshal(&RPCMethodCall{CallSeq: int32(seq), Method: method, Args: res}); err == nil {
 		if !c.conn.Send(net.MessageId(RPC_MSGID_CALL), body) {
 			fwlogger.E("-- call rpc method %s failed! send message failed --", method)
 		} else {
@@ -177,7 +183,9 @@ func (c *Client) CallNoReturn(method string, args *Args) bool {
 	}
 	c.l.RLock()
 	defer c.l.RUnlock()
-	if body, err := defaultCodec.Marshal(&RPCMethodCall{CallSeq: int32(c.identifier.GenIdentity()), Method: method, Args: *args}); err == nil {
+	res := make(map[string]*RPCValue)
+	args.ToRPCMap(&res)
+	if body, err := defaultCodec.Marshal(&RPCMethodCall{CallSeq: int32(c.identifier.GenIdentity()), Method: method, Args: res}); err == nil {
 		if !c.conn.Send(net.MessageId(RPC_MSGID_CALL), body) {
 			fwlogger.E("-- call rpc method %s failed! send message failed --", method)
 		} else {
@@ -214,7 +222,9 @@ func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 			return
 		}
 		fwlogger.D("@call method %s(%d) with args %s", call.Method, call.CallSeq, call.Args)
-		ctx := &Context{conn: conn, callSeq: call.CallSeq, Method: call.Method, Args: call.Args}
+		args := Args{}
+		args.FromRPCMap(&call.Args)
+		ctx := &Context{conn: conn, callSeq: call.CallSeq, Method: call.Method, Args: args}
 		callMethod(c.endName, call.Method, ctx)
 	case RPC_MSGID_RETURN:
 		ret := &RPCMethodReturn{}
@@ -223,7 +233,9 @@ func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 			return
 		}
 		fwlogger.D("@receive return from RPC method %s(%d) with result %s", ret.Method, ret.CallSeq, ret.Returns)
-		c.receiveResult(utils.Identity(ret.CallSeq), &Result{Args: ret.Returns})
+		args := Args{}
+		args.FromRPCMap(&ret.Returns)
+		c.receiveResult(utils.Identity(ret.CallSeq), &Result{Args: args})
 	}
 }
 

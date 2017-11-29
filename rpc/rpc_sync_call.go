@@ -19,6 +19,7 @@ import (
 	"github.com/snippetor/bingo/utils"
 	"github.com/snippetor/bingo/net"
 	"github.com/snippetor/bingo/log/fwlogger"
+	"sync"
 )
 
 type callTask struct {
@@ -32,38 +33,40 @@ type callTask struct {
 }
 
 type callSyncWorker struct {
-	callTasks        map[utils.Identity]*callTask
+	callTasks        *sync.Map //[utils.Identity]*callTask
 	isMonitorRunning bool
 }
 
 func (w *callSyncWorker) waitingResult(t *callTask) {
 	if w.callTasks == nil {
-		w.callTasks = make(map[utils.Identity]*callTask)
+		w.callTasks = &sync.Map{}
 	}
-	w.callTasks[t.seq] = t
+	w.callTasks.Store(t.seq, t)
 	if !w.isMonitorRunning {
 		w.isMonitorRunning = true
 		// RPC调用超时检测
 		go func() {
-			t := time.NewTicker(time.Second)
+			ticker := time.NewTicker(time.Second)
 			for {
 				select {
-				case now := <-t.C:
-					for seq, t := range w.callTasks {
-						if t == nil || t.conn == nil || t.conn.GetState() == net.STATE_CLOSED || t.c == nil { //无效任务，移除
-							delete(w.callTasks, seq)
+				case now := <-ticker.C:
+					w.callTasks.Range(func(k, v interface{}) bool {
+						if v == nil {
+							w.callTasks.Delete(k)
 						} else {
-							if (now.UnixNano() - t.t) > int64(2*time.Second) { // 两秒超时
-								if t, ok := w.callTasks[seq]; ok {
-									t.c(nil) // 返回nil
-									delete(w.callTasks, seq)
-								} else {
-									fwlogger.W("-- RPC method callback ignored, no found call task for %d --", seq)
+							task := v.(*callTask)
+							if task == nil || task.conn == nil || task.conn.GetState() == net.STATE_CLOSED || task.c == nil { //无效任务，移除
+								w.callTasks.Delete(k)
+							} else {
+								if (now.UnixNano() - task.t) > int64(2*time.Second) { // 两秒超时
+									task.c(nil) // 返回nil
+									w.callTasks.Delete(k)
+									fwlogger.E("-- RPC method callback timeout, %s(%d) %d %s --", task.method, k, task.conn.Identity(), task.conn.Address())
 								}
-								fwlogger.E("-- RPC method callback timeout, %s(%d) %d %s --", t.method, seq, t.conn.Identity(), t.conn.Address())
 							}
 						}
-					}
+						return true
+					})
 				}
 			}
 		}()
@@ -75,10 +78,12 @@ func (w *callSyncWorker) receiveResult(callSeq utils.Identity, result *Result) {
 		fwlogger.E("-- RPC callSyncWorker.callTask not init --")
 		return
 	}
-	if t, ok := w.callTasks[callSeq]; ok {
-		t.c(result)
-		delete(w.callTasks, callSeq)
-	} else {
-		fwlogger.W("-- RPC method callback ignored, no found call task for %d --", callSeq)
+	if t, ok := w.callTasks.Load(callSeq); ok {
+		if t != nil {
+			t.(*callTask).c(result)
+			w.callTasks.Delete(callSeq)
+			return
+		}
 	}
+	fwlogger.W("-- RPC method callback ignored, no found call task for %d --", callSeq)
 }

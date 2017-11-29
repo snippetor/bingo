@@ -16,144 +16,156 @@ package rpc
 
 import (
 	"github.com/snippetor/bingo/net"
-	"strconv"
 	"github.com/snippetor/bingo/log/fwlogger"
+	"github.com/snippetor/bingo/utils"
+	"reflect"
 )
 
-type Args map[string]string
+const (
+	TYPE_INT           = iota
+	TYPE_INT8
+	TYPE_INT16
+	TYPE_INT32
+	TYPE_INT64
+	TYPE_UINT
+	TYPE_UINT8
+	TYPE_UINT16
+	TYPE_UINT32
+	TYPE_UINT64
+	TYPE_FLOAT32
+	TYPE_FLOAT64
+	TYPE_STRING
+	TYPE_BOOL
+	TYPE_INT32_ARRAY
+	TYPE_INT64_ARRAY
+	TYPE_UINT32_ARRAY
+	TYPE_UINT64_ARRAY
+	TYPE_FLOAT32_ARRAY
+	TYPE_FLOAT64_ARRAY
+	TYPE_STRING_ARRAY
+	TYPE_BOOL_ARRAY
+	TYPE_BYTE_ARRAY
+)
 
-func (a Args) Put(key, value string) {
-	a[key] = value
+type Args struct {
+	utils.ValueMap
 }
 
-func (a Args) Get(key string) (string, bool) {
-	v, ok := a[key]
-	return v, ok
-}
-
-func (a Args) MustGet(key, def string) string {
-	if v, ok := a[key]; ok {
-		return v
-	}
-	return def
-}
-
-func (a Args) PutInt(key string, value int) {
-	a[key] = strconv.Itoa(value)
-}
-
-func (a Args) GetInt(key string) (int, bool) {
-	if v, ok := a[key]; ok {
-		if i, err := strconv.Atoi(v); err == nil {
-			return i, true
+func (a *Args) ToRPCMap(m *map[string]*RPCValue) {
+	a.Range(func(k string, v *utils.Value) bool {
+		kind := reflect.TypeOf(v.Get()).Kind()
+		switch kind {
+		case reflect.Int:
+			(*m)[k] = &RPCValue{Kind: TYPE_INT, I32: int32(v.GetInt())}
+		case reflect.Int8:
+			(*m)[k] = &RPCValue{Kind: TYPE_INT8, I32: int32(v.GetInt8())}
+		case reflect.Int16:
+			(*m)[k] = &RPCValue{Kind: TYPE_INT16, I32: int32(v.GetInt16())}
+		case reflect.Int32:
+			(*m)[k] = &RPCValue{Kind: TYPE_INT32, I32: v.GetInt32()}
+		case reflect.Int64:
+			(*m)[k] = &RPCValue{Kind: TYPE_INT64, I64: v.GetInt64()}
+		case reflect.Uint:
+			(*m)[k] = &RPCValue{Kind: TYPE_UINT, U32: uint32(v.GetUint())}
+		case reflect.Uint8:
+			(*m)[k] = &RPCValue{Kind: TYPE_UINT8, U32: uint32(v.GetUint8())}
+		case reflect.Uint16:
+			(*m)[k] = &RPCValue{Kind: TYPE_UINT16, U32: uint32(v.GetUint16())}
+		case reflect.Uint32:
+			(*m)[k] = &RPCValue{Kind: TYPE_UINT32, U32: v.GetUint32()}
+		case reflect.Uint64:
+			(*m)[k] = &RPCValue{Kind: TYPE_UINT64, U64: v.GetUint64()}
+		case reflect.Float32:
+			(*m)[k] = &RPCValue{Kind: TYPE_FLOAT32, F32: v.GetFloat32()}
+		case reflect.Float64:
+			(*m)[k] = &RPCValue{Kind: TYPE_FLOAT64, F64: v.GetFloat64()}
+		case reflect.String:
+			(*m)[k] = &RPCValue{Kind: TYPE_STRING, S: v.GetString()}
+		case reflect.Bool:
+			(*m)[k] = &RPCValue{Kind: TYPE_BOOL, B: v.GetBool()}
+		case reflect.Array, reflect.Slice:
+			value := reflect.ValueOf(v.Get())
+			l := value.Len()
+			if l > 0 {
+				t := value.Index(0).Type()
+				switch t.Kind() {
+				case reflect.Int32:
+					(*m)[k] = &RPCValue{Kind: TYPE_INT32_ARRAY, I32A: v.GetInt32Array()}
+				case reflect.Int64:
+					(*m)[k] = &RPCValue{Kind: TYPE_INT64_ARRAY, I64A: v.GetInt64Array()}
+				case reflect.Uint32:
+					(*m)[k] = &RPCValue{Kind: TYPE_UINT32_ARRAY, U32A: v.GetUint32Array()}
+				case reflect.Uint64:
+					(*m)[k] = &RPCValue{Kind: TYPE_UINT64_ARRAY, U64A: v.GetUint64Array()}
+				case reflect.Float32:
+					(*m)[k] = &RPCValue{Kind: TYPE_FLOAT32_ARRAY, F32A: v.GetFloat32Array()}
+				case reflect.Float64:
+					(*m)[k] = &RPCValue{Kind: TYPE_FLOAT64_ARRAY, F64A: v.GetFloat64Array()}
+				case reflect.String:
+					(*m)[k] = &RPCValue{Kind: TYPE_STRING_ARRAY, Sa: v.GetStringArray()}
+				case reflect.Bool:
+					(*m)[k] = &RPCValue{Kind: TYPE_BOOL_ARRAY, Ba: v.GetBoolArray()}
+				}
+			}
 		}
-	}
-	return 0, false
+		return true
+	})
 }
 
-func (a Args) MustGetInt(key string, def int) int {
-	if v, ok := a.GetInt(key); ok {
-		return v
-	}
-	return def
-}
-
-func (a Args) PutInt32(key string, value int32) {
-	a[key] = strconv.Itoa(int(value))
-}
-
-func (a Args) GetInt32(key string) (int32, bool) {
-	if v, ok := a[key]; ok {
-		if i, err := strconv.Atoi(v); err == nil {
-			return int32(i), true
+func (a *Args) FromRPCMap(m *map[string]*RPCValue) {
+	var res *utils.Value
+	for k, v := range *m {
+		res = &utils.Value{}
+		switch v.Kind {
+		case TYPE_INT:
+			res.Set(int(v.I32))
+		case TYPE_INT8:
+			res.Set(int8(v.I32))
+		case TYPE_INT16:
+			res.Set(int16(v.I32))
+		case TYPE_INT32:
+			res.Set(v.I32)
+		case TYPE_INT64:
+			res.Set(v.I64)
+		case TYPE_UINT:
+			res.Set(uint(v.U32))
+		case TYPE_UINT8:
+			res.Set(uint8(v.U32))
+		case TYPE_UINT16:
+			res.Set(uint16(v.U32))
+		case TYPE_UINT32:
+			res.Set(v.U32)
+		case TYPE_UINT64:
+			res.Set(v.U64)
+		case TYPE_FLOAT32:
+			res.Set(v.F32)
+		case TYPE_FLOAT64:
+			res.Set(v.F64)
+		case TYPE_STRING:
+			res.Set(v.S)
+		case TYPE_BOOL:
+			res.Set(v.B)
+		case TYPE_INT32_ARRAY:
+			res.Set(v.I32A)
+		case TYPE_INT64_ARRAY:
+			res.Set(v.I64A)
+		case TYPE_UINT32_ARRAY:
+			res.Set(v.U32A)
+		case TYPE_UINT64_ARRAY:
+			res.Set(v.U64A)
+		case TYPE_FLOAT32_ARRAY:
+			res.Set(v.F32A)
+		case TYPE_FLOAT64_ARRAY:
+			res.Set(v.F64A)
+		case TYPE_STRING_ARRAY:
+			res.Set(v.Sa)
+		case TYPE_BOOL_ARRAY:
+			res.Set(v.Ba)
+		case TYPE_BYTE_ARRAY:
+			res.Set(v.S)
 		}
+		a.Put(k, res)
 	}
-	return 0, false
-}
-
-func (a Args) MustGetInt32(key string, def int32) int32 {
-	if v, ok := a.GetInt32(key); ok {
-		return v
-	}
-	return def
-}
-
-func (a Args) PutInt64(key string, value int64) {
-	a[key] = strconv.FormatInt(value, 10)
-}
-
-func (a Args) GetInt64(key string) (int64, bool) {
-	if v, ok := a[key]; ok {
-		if i, err := strconv.ParseInt(v, 10, 64); err == nil {
-			return i, true
-		}
-	}
-	return 0, false
-}
-
-func (a Args) MustGetInt64(key string, def int64) int64 {
-	if v, ok := a.GetInt64(key); ok {
-		return v
-	}
-	return def
-}
-
-func (a Args) PutFloat32(key string, value float32) {
-	a[key] = strconv.FormatFloat(float64(value), 'f', -1, 32)
-}
-
-func (a Args) GetFloat32(key string) (float32, bool) {
-	if v, ok := a[key]; ok {
-		if i, err := strconv.ParseFloat(v, 32); err == nil {
-			return float32(i), true
-		}
-	}
-	return 0.0, false
-}
-
-func (a Args) MustGetFloat32(key string, def float32) float32 {
-	if v, ok := a.GetFloat32(key); ok {
-		return v
-	}
-	return def
-}
-
-func (a Args) PutBool(key string, value bool) {
-	a[key] = strconv.FormatBool(value)
-}
-
-func (a Args) GetBool(key string) (bool, bool) {
-	if v, ok := a[key]; ok {
-		if i, err := strconv.ParseBool(v); err == nil {
-			return i, true
-		}
-	}
-	return false, false
-}
-
-func (a Args) MustGetBool(key string, def bool) bool {
-	if v, ok := a.GetBool(key); ok {
-		return v
-	}
-	return def
-}
-
-func (a Args) PutBytes(key string, value []byte) {
-	a[key] = string(value)
-}
-
-func (a Args) GetBytes(key string) ([]byte, bool) {
-	if v, ok := a[key]; ok {
-		return []byte(v), true
-	}
-	return nil, false
-}
-
-func (a Args) MustGetBytes(key string, def []byte) []byte {
-	if v, ok := a.GetBytes(key); ok {
-		return v
-	}
-	return def
 }
 
 type Context struct {
@@ -165,7 +177,9 @@ type Context struct {
 }
 
 func (c *Context) Return(r *Result) {
-	if body, err := defaultCodec.Marshal(&RPCMethodReturn{CallSeq: c.callSeq, Method: c.Method, Returns: r.Args}); err == nil {
+	res := make(map[string]*RPCValue)
+	r.Args.ToRPCMap(&res)
+	if body, err := defaultCodec.Marshal(&RPCMethodReturn{CallSeq: c.callSeq, Method: c.Method, Returns: res}); err == nil {
 		if !c.conn.Send(net.MessageId(RPC_MSGID_RETURN), body) {
 			fwlogger.E("-- return rpc method %s failed! send message failed --", c.Method)
 		}

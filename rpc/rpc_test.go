@@ -11,7 +11,7 @@ func TestGenCallSeq(t *testing.T) {
 }
 
 func TestMap(t *testing.T) {
-	c := &RPCMethodCall{123, "aaa.aa", nil}
+	c := &RPCMethodCall{123, "aaa.aa", nil, ""}
 	cd := codec.NewCodec(codec.Protobuf)
 	fmt.Println(c.Args == nil)
 	if bs, err := cd.Marshal(c); err == nil {

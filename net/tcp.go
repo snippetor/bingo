@@ -33,7 +33,7 @@ func (c *tcpConn) Send(msgId MessageId, body MessageBody) bool {
 		c.conn.Write(GetDefaultMessagePacker().Pack(msgId, body))
 		return true
 	} else {
-		fwlogger.W("-- send message failed!!! --")
+		fwlogger.W("-- send message failed!!! -- %#X", msgId)
 		return false
 	}
 }
@@ -90,7 +90,7 @@ func (s *tcpServer) listen(port int, callback IMessageCallback) bool {
 		if err != nil {
 			continue
 		}
-		fwlogger.I(conn.RemoteAddr().String() + " %s", " tcp connect success")
+		fwlogger.I(conn.RemoteAddr().String()+" %s", " tcp connect success")
 		c := IConn(&tcpConn{conn: conn})
 		c.setState(STATE_CONNECTED)
 		s.Lock()

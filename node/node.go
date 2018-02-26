@@ -88,17 +88,17 @@ func run_node(n *Node) {
 	}
 	m.setNodeName(n.Name)
 
+
 	// config
 	vm := &utils.ValueMap{}
 	for k, v := range n.Config {
-		value := &utils.Value{}
-		value.Set(v)
-		vm.Put(k, value)
+		vm.Put(k, v)
 	}
 	m.setConfig(vm)
 
 	// init
 	m.init()
+	m.OnInit()
 
 	// rpc
 	if n.RpcPort > 0 {

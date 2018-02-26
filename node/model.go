@@ -202,7 +202,6 @@ func (m *Model) init() {
 	m.Service = &ServiceModule{}
 	// init Proto module
 	m.Proto = &ProtoModule{proto: proto.NewMessageProtocol(codec.Protobuf), clientProtoVer: ""}
-	m.OnInit()
 }
 
 func (m *Model) setNodeName(name string) {

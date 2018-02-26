@@ -25,6 +25,7 @@ import (
 	"github.com/Unknwon/goconfig"
 	"github.com/snippetor/bingo/utils"
 	"io/ioutil"
+	"bytes"
 )
 
 type Config struct {
@@ -85,13 +86,18 @@ type Logger struct {
 	// 内置logger
 	lg *log.Logger
 	// 日志队列
-	c chan string
+	c chan *OutputLog
 	// 当前日志文件
 	f *os.File
 	// 检查文件monitor是否在运行
 	isMonitorRunning bool
 	// 日志前缀，将写在日期和等级后面，日志内容前面
 	prefixes []string
+}
+
+type OutputLog struct {
+	level   Level
+	content string
 }
 
 func NewLogger(configFile string) *Logger {
@@ -111,19 +117,27 @@ func NewLoggerWithConfig(config *Config) *Logger {
 }
 
 func (l *Logger) init() {
-	l.c = make(chan string, 5000)
+	l.c = make(chan *OutputLog, 5000)
 	// log write
 	go func() {
 		for {
 			s := <-l.c
 			if l.config.OutputType&Console == Console {
-				fmt.Println(time.Now().Format("15:04:05") + " " + s)
+				if s.level == Info {
+					fmt.Println("\x1B[0;32m" + time.Now().Format("15:04:05") + " " + s.content + "\x1B[0m")
+				} else if s.level == Debug {
+					fmt.Println("\x1B[0;34m" + time.Now().Format("15:04:05") + " " + s.content + "\x1B[0m")
+				} else if s.level == Warning {
+					fmt.Println("\x1B[0;33m" + time.Now().Format("15:04:05") + " " + s.content + "\x1B[0m")
+				} else if s.level == Error {
+					fmt.Println("\x1B[0;31m" + time.Now().Format("15:04:05") + " " + s.content + "\x1B[0m")
+				}
 			}
 			if l.config.OutputType&File == File {
 				if l.f == nil || l.lg == nil {
 					l.makeFile()
 				}
-				l.lg.Output(2, s)
+				l.lg.Output(2, s.content)
 			}
 		}
 	}()
@@ -182,19 +196,23 @@ func (l *Logger) SetPrefixes(prefix ...string) {
 }
 
 func (l *Logger) formatPrefixes() string {
-	f := "|"
-	for _, p := range l.prefixes {
-		f = f + p + "|"
+	var buf bytes.Buffer
+	buf.WriteString(" ")
+	for i, p := range l.prefixes {
+		buf.WriteString(p)
+		if i < len(l.prefixes)-1 {
+			buf.WriteString(" ")
+		}
 	}
-	return f
+	return buf.String()
 }
 
 func (l *Logger) I(format string, v ...interface{}) {
 	if Info >= l.config.Level {
 		if len(v) == 0 {
-			l.c <- "[I] " + l.formatPrefixes() + format
+			l.c <- &OutputLog{Info, "[I]" + l.formatPrefixes() + format}
 		} else {
-			l.c <- "[I] " + l.formatPrefixes() + fmt.Sprintf(format, v...)
+			l.c <- &OutputLog{Info, "[I]" + l.formatPrefixes() + fmt.Sprintf(format, v...)}
 		}
 	}
 }
@@ -202,9 +220,9 @@ func (l *Logger) I(format string, v ...interface{}) {
 func (l *Logger) D(format string, v ...interface{}) {
 	if Debug >= l.config.Level {
 		if len(v) == 0 {
-			l.c <- "[D] " + l.formatPrefixes() + format
+			l.c <- &OutputLog{Debug, "[D]" + l.formatPrefixes() + format}
 		} else {
-			l.c <- "[D] " + l.formatPrefixes() + fmt.Sprintf(format, v...)
+			l.c <- &OutputLog{Debug, "[D]" + l.formatPrefixes() + fmt.Sprintf(format, v...)}
 		}
 	}
 }
@@ -212,9 +230,9 @@ func (l *Logger) D(format string, v ...interface{}) {
 func (l *Logger) W(format string, v ...interface{}) {
 	if Warning >= l.config.Level {
 		if len(v) == 0 {
-			l.c <- "[W] " + l.formatPrefixes() + format
+			l.c <- &OutputLog{Warning, "[W]" + l.formatPrefixes() + format}
 		} else {
-			l.c <- "[W] " + l.formatPrefixes() + fmt.Sprintf(format, v...)
+			l.c <- &OutputLog{Warning, "[W]" + l.formatPrefixes() + fmt.Sprintf(format, v...)}
 		}
 	}
 }
@@ -222,9 +240,9 @@ func (l *Logger) W(format string, v ...interface{}) {
 func (l *Logger) E(format string, v ...interface{}) {
 	if Error >= l.config.Level {
 		if len(v) == 0 {
-			l.c <- "[E] " + l.formatPrefixes() + format
+			l.c <- &OutputLog{Error, "[E]" + l.formatPrefixes() + format}
 		} else {
-			l.c <- "[E] " + l.formatPrefixes() + fmt.Sprintf(format, v...)
+			l.c <- &OutputLog{Error, "[E]" + l.formatPrefixes() + fmt.Sprintf(format, v...)}
 		}
 	}
 }
@@ -253,14 +271,24 @@ func (l *Logger) makeFile() {
 	}
 	if l.f == nil {
 		var err error
-		var fileName string = l.config.LogFileName
+		var fileName = l.config.LogFileName
 		if l.config.LogFileRollingType&RollingDaily == RollingDaily {
 			t := time.Now().Format(l.config.LogFileNameDatePattern)
 			fileName += "-" + t
 		}
 		if l.config.LogFileRollingType&RollingSize == RollingSize {
-			fileName += "-" + l.genFileSeq()
+			seqFile := filepath.Join(l.config.LogFileOutputDir, ".seq")
+			if utils.IsFileExists(seqFile) {
+				if bytes, err := ioutil.ReadFile(seqFile); err == nil {
+					fileName += "-" + string(bytes)
+				} else {
+					fileName += "-" + l.genFileSeq()
+				}
+			} else {
+				fileName += "-" + l.genFileSeq()
+			}
 		}
+		os.Mkdir(l.config.LogFileOutputDir, os.ModePerm)
 		l.f, err = os.OpenFile(filepath.Join(l.config.LogFileOutputDir, fileName+l.config.LogFileNameExt), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 		if err != nil {
 			log.Println("=========== create log file failed!!! ========", err)
@@ -331,10 +359,11 @@ func (l *Logger) checkFile() {
 
 	if needRecreate {
 		l.f.Close()
+		os.Mkdir(l.config.LogFileOutputDir, os.ModePerm)
 		var err error
 		l.f, err = os.OpenFile(filepath.Join(l.config.LogFileOutputDir, newFileName+l.config.LogFileNameExt), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 		if err != nil {
-			log.Println("=========== create log file failed!!! ========", err)
+			log.Println("=========== open log file failed!!! ========", err)
 			return
 		}
 		l.lg.SetOutput(l.f)

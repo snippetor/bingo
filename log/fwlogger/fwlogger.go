@@ -14,7 +14,10 @@
 
 package fwlogger
 
-import "github.com/snippetor/bingo/log"
+import (
+	"github.com/snippetor/bingo/log"
+	"time"
+)
 
 var (
 	// bingo框架日志
@@ -22,21 +25,35 @@ var (
 )
 
 func init() {
-	fwLogger = log.NewLoggerWithConfig(log.DEFAULT_CONFIG)
+	fwLogger = log.NewLoggerWithConfig(&log.Config{
+		Level:                  log.Warning,
+		OutputType:             log.Console | log.File,
+		LogFileRollingType:     log.RollingDaily,
+		LogFileOutputDir:       ".",
+		LogFileName:            "bingo",
+		LogFileNameDatePattern: "20060102",
+		LogFileNameExt:         ".log",
+		LogFileMaxSize:         1 * log.GB,
+		LogFileScanInterval:    10 * time.Minute,
+	})
+}
+
+func SetLevel(level log.Level) {
+	fwLogger.SetLevel(level)
 }
 
 func I(format string, v ...interface{}) {
-	fwLogger.I("[FW] " + format, v...)
+	fwLogger.I("[FW] "+format, v...)
 }
 
 func D(format string, v ...interface{}) {
-	fwLogger.D("[FW] " + format, v...)
+	fwLogger.D("[FW] "+format, v...)
 }
 
 func W(format string, v ...interface{}) {
-	fwLogger.W("[FW] " + format, v...)
+	fwLogger.W("[FW] "+format, v...)
 }
 
 func E(format string, v ...interface{}) {
-	fwLogger.E("[FW] " + format, v...)
+	fwLogger.E("[FW] "+format, v...)
 }

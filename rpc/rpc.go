@@ -200,7 +200,7 @@ func (c *Client) CallNoReturn(method string, args *Args) bool {
 func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
 	switch RPC_MSGID(msgId) {
 	case RPC_MSGID(net.MSGID_CONNECT_CONNECTED):
-		fwlogger.D("-- connect success %s --", c.endName)
+		fwlogger.D("-- %s connect RPC server success  --", c.endName)
 		// send handshake to RPC server
 		if body, err := defaultCodec.Marshal(&RPCHandShake{EndName: c.endName}); err == nil {
 			if !conn.Send(net.MessageId(RPC_MSGID_HANDSHAKE), body) {

@@ -78,7 +78,7 @@ var DEFAULT_CONFIG = &Config{
 	LogFileNameDatePattern: "20060102",
 	LogFileNameExt:         ".log",
 	LogFileMaxSize:         500 * MB,
-	LogFileScanInterval:    1 * time.Second,
+	LogFileScanInterval:    10 * time.Minute,
 }
 
 type Logger struct {
@@ -114,6 +114,10 @@ func NewLoggerWithConfig(config *Config) *Logger {
 	l.setConfig(config)
 	l.init()
 	return l
+}
+
+func (l *Logger) SetLevel(level Level) {
+	l.config.Level = level
 }
 
 func (l *Logger) init() {
@@ -197,10 +201,9 @@ func (l *Logger) SetPrefixes(prefix ...string) {
 
 func (l *Logger) formatPrefixes() string {
 	var buf bytes.Buffer
-	buf.WriteString(" ")
-	for i, p := range l.prefixes {
-		buf.WriteString(p)
-		if i < len(l.prefixes)-1 {
+	if len(l.prefixes) > 0 {
+		for _, p := range l.prefixes {
+			buf.WriteString(p)
 			buf.WriteString(" ")
 		}
 	}
@@ -210,9 +213,9 @@ func (l *Logger) formatPrefixes() string {
 func (l *Logger) I(format string, v ...interface{}) {
 	if Info >= l.config.Level {
 		if len(v) == 0 {
-			l.c <- &OutputLog{Info, "[I]" + l.formatPrefixes() + format}
+			l.c <- &OutputLog{Info, "[I] " + l.formatPrefixes() + format}
 		} else {
-			l.c <- &OutputLog{Info, "[I]" + l.formatPrefixes() + fmt.Sprintf(format, v...)}
+			l.c <- &OutputLog{Info, "[I] " + l.formatPrefixes() + fmt.Sprintf(format, v...)}
 		}
 	}
 }
@@ -220,9 +223,9 @@ func (l *Logger) I(format string, v ...interface{}) {
 func (l *Logger) D(format string, v ...interface{}) {
 	if Debug >= l.config.Level {
 		if len(v) == 0 {
-			l.c <- &OutputLog{Debug, "[D]" + l.formatPrefixes() + format}
+			l.c <- &OutputLog{Debug, "[D] " + l.formatPrefixes() + format}
 		} else {
-			l.c <- &OutputLog{Debug, "[D]" + l.formatPrefixes() + fmt.Sprintf(format, v...)}
+			l.c <- &OutputLog{Debug, "[D] " + l.formatPrefixes() + fmt.Sprintf(format, v...)}
 		}
 	}
 }
@@ -230,9 +233,9 @@ func (l *Logger) D(format string, v ...interface{}) {
 func (l *Logger) W(format string, v ...interface{}) {
 	if Warning >= l.config.Level {
 		if len(v) == 0 {
-			l.c <- &OutputLog{Warning, "[W]" + l.formatPrefixes() + format}
+			l.c <- &OutputLog{Warning, "[W] " + l.formatPrefixes() + format}
 		} else {
-			l.c <- &OutputLog{Warning, "[W]" + l.formatPrefixes() + fmt.Sprintf(format, v...)}
+			l.c <- &OutputLog{Warning, "[W] " + l.formatPrefixes() + fmt.Sprintf(format, v...)}
 		}
 	}
 }
@@ -240,9 +243,9 @@ func (l *Logger) W(format string, v ...interface{}) {
 func (l *Logger) E(format string, v ...interface{}) {
 	if Error >= l.config.Level {
 		if len(v) == 0 {
-			l.c <- &OutputLog{Error, "[E]" + l.formatPrefixes() + format}
+			l.c <- &OutputLog{Error, "[E] " + l.formatPrefixes() + format}
 		} else {
-			l.c <- &OutputLog{Error, "[E]" + l.formatPrefixes() + fmt.Sprintf(format, v...)}
+			l.c <- &OutputLog{Error, "[E] " + l.formatPrefixes() + fmt.Sprintf(format, v...)}
 		}
 	}
 }

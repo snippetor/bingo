@@ -23,6 +23,8 @@ import (
 	"strings"
 	"github.com/snippetor/bingo/node"
 	"path/filepath"
+	"github.com/snippetor/bingo/log"
+	"github.com/snippetor/bingo/log/fwlogger"
 )
 
 var (
@@ -61,6 +63,10 @@ func Version() string {
 
 func BindNodeModel(modelName string, model interface{}) {
 	node.BindNodeModel(modelName, model.(node.IModel))
+}
+
+func SetLogLevel(level log.Level) {
+	fwlogger.SetLevel(level)
 }
 
 func Run() {

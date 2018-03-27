@@ -140,58 +140,11 @@ func (m *ServiceModule) Close() {
 	}
 }
 
-// proto
-type ProtoModule struct {
-	proto          *proto.MessageProtocol
-	clientProtoVer string
-}
-
-func (m *ProtoModule) SetDefaultMessageProtocol(c codec.CodecType) {
-	m.proto = proto.NewMessageProtocol(c)
-}
-
-func (m *ProtoModule) GetDefaultMessageProtocol() *proto.MessageProtocol {
-	return m.proto
-}
-
-func (m *ProtoModule) SetClientProtoVersion(version string) {
-	m.clientProtoVer = version
-}
-
-func (m *ProtoModule) GetClientProtoVersion() string {
-	return m.clientProtoVer
-}
-
-func (m *ProtoModule) RegisterProto(msgId net.MessageId, v interface{}, protoVersion string) {
-	m.proto.GetProtoCollection().Put(msgId, v, protoVersion)
-}
-
-func (m *ProtoModule) RegisterProtoDefault(msgId net.MessageId, v interface{}) {
-	m.proto.GetProtoCollection().PutDefault(msgId, v)
-}
-
-func (m *ProtoModule) Marshal(v interface{}) (net.MessageBody, bool) {
-	return m.proto.Marshal(v)
-}
-
-func (m *ProtoModule) Unmarshal(data net.MessageBody, v interface{}) bool {
-	return m.proto.Unmarshal(data, v)
-}
-
-func (m *ProtoModule) UnmarshalTo(msgId net.MessageId, data net.MessageBody, clientProtoVersion string) (interface{}, bool) {
-	return m.proto.UnmarshalTo(msgId, data, clientProtoVersion)
-}
-
-func (m *ProtoModule) UnmarshalToDefault(msgId net.MessageId, data net.MessageBody) (interface{}, bool) {
-	return m.proto.UnmarshalToDefault(msgId, data)
-}
-
 // model
 type Model struct {
 	nodeName string
 	RPC      *RPCModule
 	Service  *ServiceModule
-	Proto    *ProtoModule
 	Config   *utils.ValueMap
 }
 
@@ -200,8 +153,6 @@ func (m *Model) init() {
 	m.RPC = &RPCModule{nodeName: m.nodeName}
 	// init Service module
 	m.Service = &ServiceModule{}
-	// init Proto module
-	m.Proto = &ProtoModule{proto: proto.NewMessageProtocol(codec.Protobuf), clientProtoVer: ""}
 }
 
 func (m *Model) setNodeName(name string) {

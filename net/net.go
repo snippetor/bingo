@@ -16,14 +16,19 @@ package net
 
 import (
 	"github.com/snippetor/bingo/log/fwlogger"
+	"github.com/snippetor/bingo/codec"
 )
 
 var (
 	globalPacker IMessagePacker
+	JsonCodec codec.ICodec
+	ProtobufCodec codec.ICodec
 )
 
 func init() {
 	globalPacker = IMessagePacker(&DefaultMessagePacker{})
+	JsonCodec = codec.NewCodec(codec.Json)
+	ProtobufCodec = codec.NewCodec(codec.Protobuf)
 }
 
 func SetDefaultMessagePacker(packer IMessagePacker) {

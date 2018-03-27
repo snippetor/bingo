@@ -22,9 +22,33 @@ import (
 type MessageId int32
 type MessageBody []byte
 
+func (b MessageBody) ToJson(v interface{}) {
+	JsonCodec.Unmarshal(b, v)
+}
+
+func (b MessageBody) ToProtobuf(v interface{}) {
+	ProtobufCodec.Unmarshal(b, v)
+}
+
+func (b MessageBody) FromJson(v interface{}) {
+	if res, err := JsonCodec.Marshal(v); err != nil {
+		panic(err)
+	} else {
+		copy(b, res)
+	}
+}
+
+func (b MessageBody) FromProtobuf(v interface{}) {
+	if res, err := ProtobufCodec.Marshal(v); err != nil {
+		panic(err)
+	} else {
+		copy(b, res)
+	}
+}
+
 const (
 	MSGID_CONNECT_DISCONNECT = -1
-	MSGID_CONNECT_CONNECTED = -2
+	MSGID_CONNECT_CONNECTED  = -2
 )
 
 // 消息回调

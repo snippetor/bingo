@@ -107,7 +107,6 @@ logFileScanInterval = 3
           "name":"tcp9090",
           "type": "tcp",
           "port": 9090,
-          "codec": "protobuf"   -- 编解码方式，http服务不提供编解码
         }
       ],
       "rpc-port": 9091,

@@ -30,7 +30,6 @@
           "name": "tcp9090",
           "type": "tcp",
           "port": 9090,
-          "codec": "protobuf"
         }
       ],
       "rpc-port": 9091,

@@ -31,19 +31,11 @@ func (b MessageBody) ToProtobuf(v interface{}) {
 }
 
 func (b MessageBody) FromJson(v interface{}) {
-	if res, err := JsonCodec.Marshal(v); err != nil {
-		panic(err)
-	} else {
-		copy(b, res)
-	}
+	copy(b, JsonCodec.Marshal(v))
 }
 
 func (b MessageBody) FromProtobuf(v interface{}) {
-	if res, err := ProtobufCodec.Marshal(v); err != nil {
-		panic(err)
-	} else {
-		copy(b, res)
-	}
+	copy(b, ProtobufCodec.Marshal(v))
 }
 
 const (

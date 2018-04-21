@@ -179,21 +179,15 @@ type Context struct {
 func (c *Context) Return(r *Args) {
 	res := make(map[string]*RPCValue)
 	r.ToRPCMap(&res)
-	if body, err := defaultCodec.Marshal(&RPCMethodReturn{CallSeq: c.callSeq, Method: c.Method, Returns: res}); err == nil {
-		if !c.conn.Send(net.MessageId(RPC_MSGID_RETURN), body) {
-			fwlogger.E("-- return rpc method %s failed! send message failed --", c.Method)
-		}
-	} else {
-		fwlogger.E("-- return rpc method %s failed! marshal message failed --", c.Method)
+	body := defaultCodec.Marshal(&RPCMethodReturn{CallSeq: c.callSeq, Method: c.Method, Returns: res})
+	if !c.conn.Send(net.MessageId(RPC_MSGID_RETURN), body) {
+		fwlogger.E("-- return rpc method %s failed! send message failed --", c.Method)
 	}
 }
 
 func (c *Context) ReturnNil() {
-	if body, err := defaultCodec.Marshal(&RPCMethodReturn{CallSeq: c.callSeq, Method: c.Method, Returns: nil}); err == nil {
-		if !c.conn.Send(net.MessageId(RPC_MSGID_RETURN), body) {
-			fwlogger.E("-- return rpc method %s failed! send message failed --", c.Method)
-		}
-	} else {
-		fwlogger.E("-- return rpc method %s failed! marshal message failed --", c.Method)
+	body := defaultCodec.Marshal(&RPCMethodReturn{CallSeq: c.callSeq, Method: c.Method, Returns: nil})
+	if !c.conn.Send(net.MessageId(RPC_MSGID_RETURN), body) {
+		fwlogger.E("-- return rpc method %s failed! send message failed --", c.Method)
 	}
 }

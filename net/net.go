@@ -55,7 +55,7 @@ func Listen(net NetProtocol, port int, callback IMessageCallback) (IServer, bool
 	case WebSocket:
 		server = IServer(&wsServer{})
 	default:
-		fwlogger.E("-- error net type '%d', must be 'ws' or 'tcp' --", net)
+		fwlogger.E("-- errors net type '%d', must be 'ws' or 'tcp' --", net)
 		return nil, false
 	}
 	return server, server.listen(port, callback)
@@ -70,7 +70,7 @@ func GoListen(net NetProtocol, port int, callback IMessageCallback) IServer {
 	case WebSocket:
 		server = IServer(&wsServer{})
 	default:
-		fwlogger.E("-- error net type '%d', must be 'ws' or 'tcp' --", net)
+		fwlogger.E("-- errors net type '%d', must be 'ws' or 'tcp' --", net)
 		return nil
 	}
 	go server.listen(port, callback)
@@ -86,7 +86,7 @@ func Connect(net NetProtocol, serverAddr string, callback IMessageCallback) (ICl
 	case WebSocket:
 		client = IClient(&wsClient{})
 	default:
-		fwlogger.E("-- error net type '%d', must be 'ws' or 'tcp' --", net)
+		fwlogger.E("-- errors net type '%d', must be 'ws' or 'tcp' --", net)
 		return nil, false
 	}
 	return client, client.connect(serverAddr, callback)
@@ -101,7 +101,7 @@ func GoConnect(net NetProtocol, serverAddr string, callback IMessageCallback) IC
 	case WebSocket:
 		client = IClient(&wsClient{})
 	default:
-		fwlogger.E("-- error net type '%d', must be 'ws' or 'tcp' --", net)
+		fwlogger.E("-- errors net type '%d', must be 'ws' or 'tcp' --", net)
 		return nil
 	}
 	go client.connect(serverAddr, callback)

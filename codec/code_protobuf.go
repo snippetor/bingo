@@ -17,16 +17,19 @@ package codec
 import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/snippetor/bingo/net"
+	"github.com/snippetor/bingo/errors"
 )
 
 // Protobuf消息协议
 type protoBuf struct {
 }
 
-func (p *protoBuf) Marshal(v interface{}) (net.MessageBody, error) {
-	return proto.Marshal(v.(proto.Message))
+func (p *protoBuf) Marshal(v interface{}) net.MessageBody {
+	res, err := proto.Marshal(v.(proto.Message))
+	errors.Check(err)
+	return res
 }
 
-func (p *protoBuf) Unmarshal(data net.MessageBody, v interface{}) error {
-	return proto.Unmarshal(data, v.(proto.Message))
+func (p *protoBuf) Unmarshal(data net.MessageBody, v interface{}) {
+	errors.Check(proto.Unmarshal(data, v.(proto.Message)))
 }

@@ -22,6 +22,8 @@ import (
 	"sync"
 )
 
+type RPCCallback func(*Args)
+
 type callTask struct {
 	seq        utils.Identity
 	method     string
@@ -73,7 +75,7 @@ func (w *callSyncWorker) waitingResult(t *callTask) {
 	}
 }
 
-func (w *callSyncWorker) receiveResult(callSeq utils.Identity, result *Result) {
+func (w *callSyncWorker) receiveResult(callSeq utils.Identity, result *Args) {
 	if w.callTasks == nil {
 		fwlogger.E("-- RPC callSyncWorker.callTask not init --")
 		return

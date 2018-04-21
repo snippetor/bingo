@@ -176,9 +176,9 @@ type Context struct {
 	Args
 }
 
-func (c *Context) Return(r *Result) {
+func (c *Context) Return(r *Args) {
 	res := make(map[string]*RPCValue)
-	r.Args.ToRPCMap(&res)
+	r.ToRPCMap(&res)
 	if body, err := defaultCodec.Marshal(&RPCMethodReturn{CallSeq: c.callSeq, Method: c.Method, Returns: res}); err == nil {
 		if !c.conn.Send(net.MessageId(RPC_MSGID_RETURN), body) {
 			fwlogger.E("-- return rpc method %s failed! send message failed --", c.Method)

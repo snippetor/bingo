@@ -32,7 +32,8 @@ func init() {
 }
 
 type IEndStub interface {
-	Call(method string, args *Args) (*Result, bool)
+	SetRouter(router *Router)
+	Call(method string, args *Args) (*Args, bool)
 	CallNoReturn(method string, args *Args) bool
 }
 
@@ -43,6 +44,7 @@ type Server struct {
 	l          *sync.RWMutex
 	identifier *utils.Identifier
 	callSyncWorker
+	r          *Router
 }
 
 func (s *Server) Listen(endName string, port int) {
@@ -96,7 +98,7 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 		args := Args{}
 		args.FromRPCMap(&call.Args)
 		ctx := &Context{conn: conn, callSeq: call.CallSeq, Method: call.Method, Args: args}
-		callMethod(s.endName, call.Method, ctx)
+		s.r.Invoke(s.endName, call.Method, ctx)
 	case RPC_MSGID_RETURN:
 		ret := &RPCMethodReturn{}
 		if err := defaultCodec.Unmarshal(body, ret); err != nil {
@@ -106,7 +108,7 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 		fwlogger.D("@receive return from RPC method %s(%d) with result %s", ret.Method, ret.CallSeq, ret.Returns)
 		args := Args{}
 		args.FromRPCMap(&ret.Returns)
-		s.receiveResult(utils.Identity(ret.CallSeq), &Result{Args: args})
+		s.receiveResult(utils.Identity(ret.CallSeq), &args)
 	}
 }
 
@@ -119,6 +121,10 @@ func (s *Server) GetClient(name string) (*Client, bool) {
 	return c, ok
 }
 
+func (s *Server) SetRouter(router *Router) {
+	s.r = router
+}
+
 type Client struct {
 	endName    string
 	conn       net.IConn
@@ -128,6 +134,7 @@ type Client struct {
 	identifier *utils.Identifier
 	callSyncWorker
 	forceClose bool
+	r          *Router
 }
 
 func (c *Client) Connect(endName, serverAddress string) {
@@ -149,7 +156,7 @@ func (c *Client) Close() {
 	c.conn.Close()
 }
 
-func (c *Client) Call(method string, args *Args) (*Result, bool) {
+func (c *Client) Call(method string, args *Args) (*Args, bool) {
 	if c.conn == nil {
 		fwlogger.E("-- call rpc method %s failed! rpc client not connect to server --", method)
 		return nil, false
@@ -163,8 +170,8 @@ func (c *Client) Call(method string, args *Args) (*Result, bool) {
 		if !c.conn.Send(net.MessageId(RPC_MSGID_CALL), body) {
 			fwlogger.E("-- call rpc method %s failed! send message failed --", method)
 		} else {
-			ch := make(chan *Result)
-			c.waitingResult(&callTask{seq: seq, conn: c.conn, msg: body, c: func(result *Result) {
+			ch := make(chan *Args)
+			c.waitingResult(&callTask{seq: seq, conn: c.conn, msg: body, c: func(result *Args) {
 				ch <- result
 			}, t: time.Now().UnixNano()})
 			res := <-ch
@@ -197,6 +204,10 @@ func (c *Client) CallNoReturn(method string, args *Args) bool {
 	return false
 }
 
+func (c *Client) SetRouter(router *Router) {
+	c.r = router
+}
+
 func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
 	switch RPC_MSGID(msgId) {
 	case RPC_MSGID(net.MSGID_CONNECT_CONNECTED):
@@ -225,7 +236,7 @@ func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 		args := Args{}
 		args.FromRPCMap(&call.Args)
 		ctx := &Context{conn: conn, callSeq: call.CallSeq, Method: call.Method, Args: args}
-		callMethod(c.endName, call.Method, ctx)
+		c.r.Invoke(c.endName, call.Method, ctx)
 	case RPC_MSGID_RETURN:
 		ret := &RPCMethodReturn{}
 		if err := defaultCodec.Unmarshal(body, ret); err != nil {
@@ -235,7 +246,7 @@ func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 		fwlogger.D("@receive return from RPC method %s(%d) with result %s", ret.Method, ret.CallSeq, ret.Returns)
 		args := Args{}
 		args.FromRPCMap(&ret.Returns)
-		c.receiveResult(utils.Identity(ret.CallSeq), &Result{Args: args})
+		c.receiveResult(utils.Identity(ret.CallSeq), &args)
 	}
 }
 

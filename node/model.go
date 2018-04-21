@@ -18,8 +18,6 @@ import (
 	"github.com/snippetor/bingo/rpc"
 	"github.com/snippetor/bingo/net"
 	"github.com/valyala/fasthttp"
-	"github.com/snippetor/bingo/proto"
-	"github.com/snippetor/bingo/codec"
 	"strings"
 	"github.com/snippetor/bingo/utils"
 )
@@ -50,10 +48,11 @@ type RPCModule struct {
 	nodeName   string
 	rpcClients map[string]*rpc.Client
 	rpcServer  *rpc.Server
+	rpcRouter  *rpc.Router
 }
 
-func (m *RPCModule) RegisterMethod(methodName string, method rpc.RPCMethod) {
-	rpc.RegisterMethod(m.nodeName, methodName, method)
+func (m *RPCModule) RegisterController(c rpc.IController) {
+	m.rpcRouter.RegisterController(m.nodeName, c)
 }
 
 func (m *RPCModule) GetEndStub(nodeName string) (rpc.IEndStub, bool) {
@@ -150,7 +149,7 @@ type Model struct {
 
 func (m *Model) init() {
 	// init RPC module
-	m.RPC = &RPCModule{nodeName: m.nodeName}
+	m.RPC = &RPCModule{nodeName: m.nodeName, rpcRouter: &rpc.Router{}}
 	// init Service module
 	m.Service = &ServiceModule{}
 }
@@ -167,6 +166,7 @@ func (m *Model) putService(name string, s net.IServer) {
 }
 
 func (m *Model) setRPCServer(serv *rpc.Server) {
+	serv.SetRouter(m.RPC.rpcRouter)
 	m.RPC.rpcServer = serv
 }
 
@@ -174,6 +174,7 @@ func (m *Model) putRPCClient(name string, client *rpc.Client) {
 	if m.RPC.rpcClients == nil {
 		m.RPC.rpcClients = make(map[string]*rpc.Client)
 	}
+	client.SetRouter(m.RPC.rpcRouter)
 	m.RPC.rpcClients[name] = client
 }
 

@@ -11,34 +11,22 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 package rpc
 
-type Result struct {
-	Args
+import "reflect"
+
+type IController interface {
+	makeRoutes(string, *Router)
 }
 
-type RPCMethod func(*Context)
-type RPCCallback func(*Result)
+type Controller struct {
+}
 
-var (
-	methods map[string]RPCMethod
-)
-
-// 注册单个方法
-func RegisterMethod(target, methodName string, f RPCMethod) {
-	if methods == nil {
-		methods = make(map[string]RPCMethod)
+func (c *Controller) makeRoutes(target string, r *Router) {
+	t := reflect.TypeOf(c)
+	var m reflect.Method
+	for i := 0; i < t.NumMethod(); i++ {
+		m = t.Method(i)
+		r.Route(target, m.Name, &m)
 	}
-	methods[makeKey(target, methodName)] = f
-}
-
-func callMethod(target, methodName string, ctx *Context) {
-	if v, ok := methods[makeKey(target, methodName)]; ok {
-		v(ctx)
-	}
-}
-
-func makeKey(target, methodName string) string {
-	return target + "." + methodName
 }

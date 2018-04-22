@@ -20,6 +20,7 @@ import (
 	"github.com/valyala/fasthttp"
 	"strings"
 	"github.com/snippetor/bingo/utils"
+	"github.com/snippetor/bingo/log"
 )
 
 var (
@@ -40,6 +41,7 @@ type IModel interface {
 	putRPCClient(string, *rpc.Client)
 	putService(string, net.IServer)
 	setConfig(*utils.ValueMap)
+	setLoggers(map[string]*log.Logger)
 	destroy()
 }
 
@@ -139,15 +141,32 @@ func (m *ServiceModule) Close() {
 	}
 }
 
+// log module
+type LogModule struct {
+	loggers map[string]*log.Logger
+}
+
+func (m *LogModule) GetLogger(name string) *log.Logger {
+	if m.loggers != nil {
+		if logger, ok := m.loggers[name]; ok {
+			return logger
+		}
+	}
+	return nil
+}
+
 // model
 type Model struct {
 	nodeName string
+	LOG      *LogModule
 	RPC      *RPCModule
 	Service  *ServiceModule
 	Config   *utils.ValueMap
 }
 
 func (m *Model) init() {
+	// init Log module
+	m.LOG = &LogModule{}
 	// init RPC module
 	m.RPC = &RPCModule{nodeName: m.nodeName, rpcRouter: &rpc.Router{}}
 	// init Service module
@@ -180,6 +199,10 @@ func (m *Model) putRPCClient(name string, client *rpc.Client) {
 
 func (m *Model) setConfig(config *utils.ValueMap) {
 	m.Config = config
+}
+
+func (m *Model) setLoggers(loggers map[string]*log.Logger) {
+	m.LOG.loggers = loggers
 }
 
 func (m *Model) destroy() {

@@ -29,17 +29,43 @@
         {
           "name": "tcp9090",
           "type": "tcp",
-          "port": 9090,
+          "port": 9090
         }
       ],
       "rpc-port": 9091,
       "rpc-to": [
         "master"
       ],
+      "log": [
+        {
+          "name": "error",
+          "level": 0,
+          "outputType": 3,
+          "outputDir": ".",
+          "rollingType": 3,
+          "fileName": "dev-err",
+          "fileNameDatePattern": "20060102",
+          "fileNameExt": ".log",
+          "fileMaxSize": "1KB",
+          "fileScanInterval": 3
+        },
+        {
+          "name": "access",
+          "level": 0,
+          "outputType": 3,
+          "outputDir": ".",
+          "rollingType": 3,
+          "fileName": "dev-access",
+          "fileNameDatePattern": "20060102",
+          "fileNameExt": ".log",
+          "fileMaxSize": "1KB",
+          "fileScanInterval": 3
+        }
+      ],
       "config": {
-        "dbName":"ddz",
-        "dbPwd":"test",
-        "port":100
+        "dbName": "ddz",
+        "dbPwd": "test",
+        "port": 100
       }
     },
     {

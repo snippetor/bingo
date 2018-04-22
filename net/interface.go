@@ -15,7 +15,10 @@
 package net
 
 import (
-	"errors"
+	errors1 "errors"
+	"encoding/json"
+	"github.com/snippetor/bingo/errors"
+	"github.com/gogo/protobuf/proto"
 	"github.com/snippetor/bingo/utils"
 )
 
@@ -23,19 +26,23 @@ type MessageId int32
 type MessageBody []byte
 
 func (b MessageBody) ToJson(v interface{}) {
-	JsonCodec.Unmarshal(b, v)
+	json.Unmarshal(b, v)
 }
 
 func (b MessageBody) ToProtobuf(v interface{}) {
-	ProtobufCodec.Unmarshal(b, v)
+	proto.Unmarshal(b, v.(proto.Message))
 }
 
 func (b MessageBody) FromJson(v interface{}) {
-	copy(b, JsonCodec.Marshal(v))
+	res, err := json.Marshal(v)
+	errors.Check(err)
+	copy(b, res)
 }
 
 func (b MessageBody) FromProtobuf(v interface{}) {
-	copy(b, ProtobufCodec.Marshal(v))
+	res, err := proto.Marshal(v.(proto.Message))
+	errors.Check(err)
+	copy(b, res)
 }
 
 const (
@@ -110,7 +117,7 @@ func (c *absConn) Address() string {
 	return "0.0.0.0"
 }
 func (c *absConn) read(*[]byte) (int, error) {
-	return -1, errors.New("-- not implements --")
+	return -1, errors1.New("-- not implements --")
 }
 func (c *absConn) GetNetProtocol() NetProtocol {
 	return -1

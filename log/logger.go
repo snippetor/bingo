@@ -23,9 +23,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"github.com/Unknwon/goconfig"
-	"github.com/snippetor/bingo/utils"
 	"io/ioutil"
 	"bytes"
+	"regexp"
 )
 
 type Config struct {
@@ -280,16 +280,7 @@ func (l *Logger) makeFile() {
 			fileName += "-" + t
 		}
 		if l.config.LogFileRollingType&RollingSize == RollingSize {
-			seqFile := filepath.Join(l.config.LogFileOutputDir, ".seq")
-			if utils.IsFileExists(seqFile) {
-				if bytes, err := ioutil.ReadFile(seqFile); err == nil {
-					fileName += "-" + string(bytes)
-				} else {
-					fileName += "-" + l.genFileSeq()
-				}
-			} else {
-				fileName += "-" + l.genFileSeq()
-			}
+			fileName += "-" + l.getNextFileSeq(fileName)
 		}
 		os.Mkdir(l.config.LogFileOutputDir, os.ModePerm)
 		l.f, err = os.OpenFile(filepath.Join(l.config.LogFileOutputDir, fileName+l.config.LogFileNameExt), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
@@ -332,13 +323,11 @@ func (l *Logger) checkFile() {
 				needRecreate = true
 				newFileName += "-" + dateString
 				newFileName += "-1"
-				l.resetFileSeq()
 			}
 		} else {
 			needRecreate = true
 			newFileName += "-" + dateString
 			newFileName += "-1"
-			l.resetFileSeq()
 		}
 	}
 
@@ -350,12 +339,12 @@ func (l *Logger) checkFile() {
 		}
 		if info.Size() >= l.config.LogFileMaxSize {
 			if needRecreate {
-				newFileName += "-" + l.genFileSeq()
+				newFileName += "-" + l.getNextFileSeq(newFileName)
 			} else {
 				needRecreate = true
 				dateString := time.Now().Format(l.config.LogFileNameDatePattern)
 				newFileName += "-" + dateString
-				newFileName += "-" + l.genFileSeq()
+				newFileName += "-" + l.getNextFileSeq(newFileName)
 			}
 		}
 	}
@@ -378,27 +367,23 @@ func (l *Logger) checkFile() {
 	}
 }
 
-// 生成日志文件序列号，并保存到.seq
-func (l *Logger) genFileSeq() string {
-	seqFile := filepath.Join(l.config.LogFileOutputDir, ".seq")
-	if utils.IsFileExists(seqFile) {
-		bytes, err := ioutil.ReadFile(seqFile)
-		if err == nil {
-			seq, err := strconv.Atoi(string(bytes))
-			if err == nil {
-				ioutil.WriteFile(seqFile, []byte(strconv.Itoa(seq+1)), 0666)
-				return strconv.Itoa(seq + 1)
+// 获取下一个文件序列号
+func (l *Logger) getNextFileSeq(fileNamePrefix string) string {
+	if files, err := ioutil.ReadDir(l.config.LogFileOutputDir); err != nil {
+		return "1"
+	} else {
+		var maxFileSeq int64 = 1
+		reg := regexp.MustCompile(fileNamePrefix + `-([0-9]+)\..*`)
+		for _, info := range files {
+			if !info.IsDir() {
+				res := reg.FindStringSubmatch(info.Name())
+				if len(res) >= 2 {
+					if seq, err := strconv.ParseInt(res[1], 10, 64); err == nil && seq > maxFileSeq {
+						maxFileSeq = seq
+					}
+				}
 			}
 		}
-	}
-	ioutil.WriteFile(seqFile, []byte("1"), 0666)
-	return "1"
-}
-
-// 重置日志文件序列号
-func (l *Logger) resetFileSeq() {
-	seqFile := filepath.Join(l.config.LogFileOutputDir, ".seq")
-	if utils.IsFileExists(seqFile) {
-		ioutil.WriteFile(seqFile, []byte("1"), 0666)
+		return strconv.FormatInt(maxFileSeq+1, 10)
 	}
 }

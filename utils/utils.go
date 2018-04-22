@@ -26,3 +26,4 @@ func IsFileExists(name string) bool {
 	}
 	return true
 }
+

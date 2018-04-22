@@ -24,6 +24,8 @@ import (
 	"strconv"
 	"github.com/snippetor/bingo/log/fwlogger"
 	"github.com/snippetor/bingo/utils"
+	"github.com/snippetor/bingo/log"
+	"time"
 )
 
 type Service struct {
@@ -34,18 +36,32 @@ type Service struct {
 }
 
 type Node struct {
-	Name      string
-	ModelName string                 `json:"model"`
-	Domain    int
-	Services  []*Service             `json:"service"`
-	RpcPort   int                    `json:"rpc-port"`
-	RpcTo     []string               `json:"rpc-to"`
-	Config    map[string]interface{} `json:"config"`
+	Name       string
+	ModelName  string                 `json:"model"`
+	Domain     int
+	Services   []*Service             `json:"service"`
+	RpcPort    int                    `json:"rpc-port"`
+	RpcTo      []string               `json:"rpc-to"`
+	Config     map[string]interface{} `json:"config"`
+	LogConfigs []LogConfig            `json:"log"`
 }
 
 type Config struct {
 	Domains []string `json:"domains"`
 	Nodes   []*Node  `json:"nodes"`
+}
+
+type LogConfig struct {
+	Name                string
+	Level               int
+	OutputType          int
+	OutputDir           string
+	RollingType         int
+	FileName            string
+	FileNameDatePattern string
+	FileNameExt         string
+	FileMaxSize         string
+	FileScanInterval    int
 }
 
 var (
@@ -88,6 +104,66 @@ func run_node(n *Node) {
 	}
 	m.setNodeName(n.Name)
 
+	// log
+	/**
+	"level": 0,
+          "outputType": 3,
+          "outputDir": ".",
+          "rollingType": 3,
+          "fileName": "dev-err",
+          "fileNameDatePattern": 20060102,
+          "fileNameExt": ".log",
+          "fileMaxSize": "1KB",
+          "fileScanInterval": 3
+	 */
+	if n.LogConfigs != nil {
+		loggers := make(map[string]*log.Logger)
+		for _, c := range n.LogConfigs {
+			config := &log.Config{
+				Level:                  log.Level(c.Level),
+				OutputType:             log.OutputType(c.OutputType),
+				LogFileOutputDir:       log.DEFAULT_CONFIG.LogFileOutputDir,
+				LogFileRollingType:     log.RollingType(c.RollingType),
+				LogFileScanInterval:    time.Duration(c.FileScanInterval),
+				LogFileName:            log.DEFAULT_CONFIG.LogFileName,
+				LogFileNameDatePattern: log.DEFAULT_CONFIG.LogFileNameDatePattern,
+				LogFileNameExt:         log.DEFAULT_CONFIG.LogFileNameExt,
+				LogFileMaxSize:         log.DEFAULT_CONFIG.LogFileMaxSize,
+			}
+			if c.OutputDir != "" {
+				config.LogFileOutputDir = c.OutputDir
+			}
+			if c.FileName != "" {
+				config.LogFileName = c.FileName
+			}
+			if c.FileNameDatePattern != "" {
+				config.LogFileNameDatePattern = c.FileNameDatePattern
+			}
+			if c.FileNameExt != "" {
+				config.LogFileNameExt = c.FileNameExt
+			}
+			if c.FileMaxSize != "" {
+				if i, err := strconv.ParseInt(c.FileMaxSize, 10, 64); err == nil {
+					config.LogFileMaxSize = i
+				} else {
+					if i, err = strconv.ParseInt(c.FileMaxSize[:len(c.FileMaxSize)-2], 10, 64); err == nil {
+						unit := strings.ToUpper(c.FileMaxSize[len(c.FileMaxSize)-2:])
+						if unit == "KB" {
+							config.LogFileMaxSize = i * log.KB
+						} else if unit == "MB" {
+							config.LogFileMaxSize = i * log.MB
+						} else if unit == "GB" {
+							config.LogFileMaxSize = i * log.GB
+						} else if unit == "TB" {
+							config.LogFileMaxSize = i * log.TB
+						}
+					}
+				}
+			}
+			loggers[c.Name] = log.NewLoggerWithConfig(config)
+		}
+		m.setLoggers(loggers)
+	}
 
 	// config
 	vm := &utils.ValueMap{}

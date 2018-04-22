@@ -30,3 +30,13 @@ func NewCodec(t CodecType) ICodec {
 	}
 	return nil
 }
+
+var (
+	JsonCodec     ICodec
+	ProtobufCodec ICodec
+)
+
+func init() {
+	JsonCodec = NewCodec(Json)
+	ProtobufCodec = NewCodec(Protobuf)
+}

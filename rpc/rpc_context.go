@@ -19,6 +19,7 @@ import (
 	"github.com/snippetor/bingo/log/fwlogger"
 	"github.com/snippetor/bingo/utils"
 	"reflect"
+	"go/types"
 )
 
 const (
@@ -53,57 +54,55 @@ type Args struct {
 
 func (a *Args) ToRPCMap(m *map[string]*RPCValue) {
 	a.Range(func(k string, v *utils.Value) bool {
-		kind := reflect.TypeOf(v.Get()).Kind()
-		switch kind {
-		case reflect.Int:
+		switch v.Get().(type) {
+		case int:
 			(*m)[k] = &RPCValue{Kind: TYPE_INT, I32: int32(v.GetInt())}
-		case reflect.Int8:
+		case int8:
 			(*m)[k] = &RPCValue{Kind: TYPE_INT8, I32: int32(v.GetInt8())}
-		case reflect.Int16:
+		case int16:
 			(*m)[k] = &RPCValue{Kind: TYPE_INT16, I32: int32(v.GetInt16())}
-		case reflect.Int32:
+		case int32:
 			(*m)[k] = &RPCValue{Kind: TYPE_INT32, I32: v.GetInt32()}
-		case reflect.Int64:
+		case int64:
 			(*m)[k] = &RPCValue{Kind: TYPE_INT64, I64: v.GetInt64()}
-		case reflect.Uint:
+		case uint:
 			(*m)[k] = &RPCValue{Kind: TYPE_UINT, U32: uint32(v.GetUint())}
-		case reflect.Uint8:
+		case uint8:
 			(*m)[k] = &RPCValue{Kind: TYPE_UINT8, U32: uint32(v.GetUint8())}
-		case reflect.Uint16:
+		case uint16:
 			(*m)[k] = &RPCValue{Kind: TYPE_UINT16, U32: uint32(v.GetUint16())}
-		case reflect.Uint32:
+		case uint32:
 			(*m)[k] = &RPCValue{Kind: TYPE_UINT32, U32: v.GetUint32()}
-		case reflect.Uint64:
+		case uint64:
 			(*m)[k] = &RPCValue{Kind: TYPE_UINT64, U64: v.GetUint64()}
-		case reflect.Float32:
+		case float32:
 			(*m)[k] = &RPCValue{Kind: TYPE_FLOAT32, F32: v.GetFloat32()}
-		case reflect.Float64:
+		case float64:
 			(*m)[k] = &RPCValue{Kind: TYPE_FLOAT64, F64: v.GetFloat64()}
-		case reflect.String:
+		case string:
 			(*m)[k] = &RPCValue{Kind: TYPE_STRING, S: v.GetString()}
-		case reflect.Bool:
+		case bool:
 			(*m)[k] = &RPCValue{Kind: TYPE_BOOL, B: v.GetBool()}
-		case reflect.Array, reflect.Slice:
+		case types.Array, types.Slice:
 			value := reflect.ValueOf(v.Get())
 			l := value.Len()
 			if l > 0 {
-				t := value.Index(0).Type()
-				switch t.Kind() {
-				case reflect.Int32:
+				switch value.Index(0).(type) {
+				case int32:
 					(*m)[k] = &RPCValue{Kind: TYPE_INT32_ARRAY, I32A: v.GetInt32Array()}
-				case reflect.Int64:
+				case int64:
 					(*m)[k] = &RPCValue{Kind: TYPE_INT64_ARRAY, I64A: v.GetInt64Array()}
-				case reflect.Uint32:
+				case uint32:
 					(*m)[k] = &RPCValue{Kind: TYPE_UINT32_ARRAY, U32A: v.GetUint32Array()}
-				case reflect.Uint64:
+				case uint64:
 					(*m)[k] = &RPCValue{Kind: TYPE_UINT64_ARRAY, U64A: v.GetUint64Array()}
-				case reflect.Float32:
+				case float32:
 					(*m)[k] = &RPCValue{Kind: TYPE_FLOAT32_ARRAY, F32A: v.GetFloat32Array()}
-				case reflect.Float64:
+				case float64:
 					(*m)[k] = &RPCValue{Kind: TYPE_FLOAT64_ARRAY, F64A: v.GetFloat64Array()}
-				case reflect.String:
+				case string:
 					(*m)[k] = &RPCValue{Kind: TYPE_STRING_ARRAY, Sa: v.GetStringArray()}
-				case reflect.Bool:
+				case bool:
 					(*m)[k] = &RPCValue{Kind: TYPE_BOOL_ARRAY, Ba: v.GetBoolArray()}
 				}
 			}

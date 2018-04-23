@@ -48,7 +48,7 @@ type IModel interface {
 // rpc
 type RPCModule struct {
 	nodeName   string
-	rpcClients map[string]*rpc.Client
+	rpcClients []*rpc.Client
 	rpcServer  *rpc.Server
 	rpcRouter  *rpc.Router
 }
@@ -64,8 +64,10 @@ func (m *RPCModule) GetEndStub(nodeName string) (rpc.IEndStub, bool) {
 		}
 	}
 	if m.rpcClients != nil && len(m.rpcClients) > 0 {
-		if c, ok := m.rpcClients[nodeName]; ok {
-			return rpc.IEndStub(c), true
+		for _, c := range m.rpcClients {
+			if c.EndName == nodeName {
+				return rpc.IEndStub(c), true
+			}
 		}
 	}
 	return nil, false
@@ -74,15 +76,34 @@ func (m *RPCModule) GetEndStub(nodeName string) (rpc.IEndStub, bool) {
 func (m *RPCModule) GetEndStubsWithPrefix(nodeNamePrefix string) []rpc.IEndStub {
 	stubs := make([]rpc.IEndStub, 0)
 	if m.rpcServer != nil {
-		for n, c := range *m.rpcServer.GetClients() {
-			if strings.HasPrefix(n, nodeNamePrefix) {
+		for _, c := range m.rpcServer.GetClients() {
+			if strings.HasPrefix(c.EndName, nodeNamePrefix) {
 				stubs = append(stubs, rpc.IEndStub(c))
 			}
 		}
 	}
 	if m.rpcClients != nil {
-		for n, c := range m.rpcClients {
-			if strings.HasPrefix(n, nodeNamePrefix) {
+		for _, c := range m.rpcClients {
+			if strings.HasPrefix(c.EndName, nodeNamePrefix) {
+				stubs = append(stubs, rpc.IEndStub(c))
+			}
+		}
+	}
+	return stubs
+}
+
+func (m *RPCModule) GetEndStubsWithModelName(nodeModelName string) []rpc.IEndStub {
+	stubs := make([]rpc.IEndStub, 0)
+	if m.rpcServer != nil {
+		for _, c := range m.rpcServer.GetClients() {
+			if nodeModelName == c.EndModelName {
+				stubs = append(stubs, rpc.IEndStub(c))
+			}
+		}
+	}
+	if m.rpcClients != nil {
+		for _, c := range m.rpcClients {
+			if nodeModelName == c.EndModelName {
 				stubs = append(stubs, rpc.IEndStub(c))
 			}
 		}
@@ -94,6 +115,20 @@ func (m *RPCModule) GetEndStubsWithPrefix(nodeNamePrefix string) []rpc.IEndStub 
 // 如果有多个stub，则通过取模算法（balancingSeed % (stubs size)）来决定使用哪个
 func (m *RPCModule) GetEndStubWithPrefixAndBalancingSeed(nodeNamePrefix string, balancingSeed int64) (rpc.IEndStub, bool) {
 	stubs := m.GetEndStubsWithPrefix(nodeNamePrefix)
+	len := len(stubs)
+	if len == 0 {
+		return nil, false
+	} else if len == 1 {
+		return stubs[0], true
+	} else {
+		return stubs[balancingSeed%int64(len)], true
+	}
+}
+
+// 通过节点模型名称和平衡因子获取stub
+// 如果有多个stub，则通过取模算法（balancingSeed % (stubs size)）来决定使用哪个
+func (m *RPCModule) GetEndStubWithModelNameAndBalancingSeed(nodeModelName string, balancingSeed int64) (rpc.IEndStub, bool) {
+	stubs := m.GetEndStubsWithModelName(nodeModelName)
 	len := len(stubs)
 	if len == 0 {
 		return nil, false
@@ -190,11 +225,8 @@ func (m *Model) setRPCServer(serv *rpc.Server) {
 }
 
 func (m *Model) putRPCClient(name string, client *rpc.Client) {
-	if m.RPC.rpcClients == nil {
-		m.RPC.rpcClients = make(map[string]*rpc.Client)
-	}
 	client.SetRouter(m.RPC.rpcRouter)
-	m.RPC.rpcClients[name] = client
+	m.RPC.rpcClients = append(m.RPC.rpcClients, client)
 }
 
 func (m *Model) setConfig(config *utils.ValueMap) {

@@ -21,6 +21,7 @@ import (
 	"time"
 	"github.com/snippetor/bingo/utils"
 	"github.com/snippetor/bingo/log/fwlogger"
+	"github.com/snippetor/bingo/node"
 )
 
 var (
@@ -38,19 +39,18 @@ type IEndStub interface {
 }
 
 type Server struct {
-	endName    string
+	n          *node.Node
 	serv       net.IServer
-	clients    map[string]*Client
+	clients    []*Client
 	l          *sync.RWMutex
 	identifier *utils.Identifier
 	callSyncWorker
 	r          *Router
 }
 
-func (s *Server) Listen(endName string, port int) {
-	s.endName = endName
+func (s *Server) Listen(node *node.Node, port int) {
+	s.n = node
 	s.l = &sync.RWMutex{}
-	s.clients = make(map[string]*Client)
 	s.identifier = utils.NewIdentifier(2)
 	if s.serv = net.GoListen(net.Tcp, port, s.handleMessage); s.serv == nil {
 		fwlogger.E("-- start rpc server failed! --")
@@ -64,26 +64,32 @@ func (s *Server) Close() {
 func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
 	switch RPC_MSGID(msgId) {
 	case net.MSGID_CONNECT_DISCONNECT:
-		for name, c := range s.clients {
+		for i, c := range s.clients {
 			if c.conn.Identity() == conn.Identity() {
 				s.l.Lock()
-				delete(s.clients, name)
+				s.clients = append(s.clients[:i], s.clients[i+1:]...)
 				s.l.Unlock()
 				break
 			}
 		}
 	case RPC_MSGID_HANDSHAKE:
+		// ack handshake to RPC server
+		body := defaultCodec.Marshal(&RPCHandShake{EndName: s.n.Name, EndModelName: s.n.ModelName})
+		if !conn.Send(net.MessageId(RPC_MSGID_HANDSHAKE), body) {
+			fwlogger.E("-- send handshake %s failed! send message failed --", s.n.Name)
+		}
 		handshake := &RPCHandShake{}
 		defaultCodec.Unmarshal(body, handshake)
 		c := &Client{}
 		c.conn = conn
-		c.endName = handshake.EndName
+		c.EndName = handshake.EndName
+		c.EndModelName = handshake.EndModelName
 		c.state = net.STATE_CONNECTED
 		c.addr = conn.Address()
 		c.identifier = utils.NewIdentifier(3)
 		c.l = &sync.RWMutex{}
 		s.l.Lock()
-		s.clients[handshake.EndName] = c
+		s.clients = append(s.clients, c)
 		s.l.Unlock()
 	case RPC_MSGID_CALL:
 		call := &RPCMethodCall{}
@@ -92,7 +98,7 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 		args := Args{}
 		args.FromRPCMap(&call.Args)
 		ctx := &Context{conn: conn, callSeq: call.CallSeq, Method: call.Method, Args: args}
-		s.r.Invoke(s.endName, call.Method, ctx)
+		s.r.Invoke(s.n.Name, call.Method, ctx)
 	case RPC_MSGID_RETURN:
 		ret := &RPCMethodReturn{}
 		defaultCodec.Unmarshal(body, ret)
@@ -103,13 +109,17 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 	}
 }
 
-func (s *Server) GetClients() *map[string]*Client {
-	return &s.clients
+func (s *Server) GetClients() []*Client {
+	return s.clients
 }
 
 func (s *Server) GetClient(name string) (*Client, bool) {
-	c, ok := s.clients[name]
-	return c, ok
+	for _, c := range s.clients {
+		if name == c.EndName {
+			return c, true
+		}
+	}
+	return nil, false
 }
 
 func (s *Server) SetRouter(router *Router) {
@@ -117,19 +127,21 @@ func (s *Server) SetRouter(router *Router) {
 }
 
 type Client struct {
-	endName    string
-	conn       net.IConn
-	l          *sync.RWMutex
-	addr       string
-	state      net.ConnState
-	identifier *utils.Identifier
+	n            *node.Node
+	EndName      string // 远端节点名称
+	EndModelName string // 远端节点模型名
+	conn         net.IConn
+	l            *sync.RWMutex
+	addr         string
+	state        net.ConnState
+	identifier   *utils.Identifier
 	callSyncWorker
-	forceClose bool
-	r          *Router
+	forceClose   bool
+	r            *Router
 }
 
-func (c *Client) Connect(endName, serverAddress string) {
-	c.endName = endName
+func (c *Client) Connect(node *node.Node, serverAddress string) {
+	c.n = node
 	c.state = net.STATE_CONNECTING
 	c.addr = serverAddress
 	c.identifier = utils.NewIdentifier(3)
@@ -196,11 +208,11 @@ func (c *Client) SetRouter(router *Router) {
 func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
 	switch RPC_MSGID(msgId) {
 	case RPC_MSGID(net.MSGID_CONNECT_CONNECTED):
-		fwlogger.D("-- %s connect RPC server success  --", c.endName)
+		fwlogger.D("-- %s connect RPC server success  --", c.EndName)
 		// send handshake to RPC server
-		body := defaultCodec.Marshal(&RPCHandShake{EndName: c.endName})
+		body := defaultCodec.Marshal(&RPCHandShake{EndName: c.n.Name, EndModelName: c.n.ModelName})
 		if !conn.Send(net.MessageId(RPC_MSGID_HANDSHAKE), body) {
-			fwlogger.E("-- send handshake %s failed! send message failed --", c.endName)
+			fwlogger.E("-- send handshake %s failed! send message failed --", c.EndName)
 		}
 	case RPC_MSGID(net.MSGID_CONNECT_DISCONNECT):
 		c.conn = nil
@@ -208,6 +220,11 @@ func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 		if !c.forceClose {
 			c.reconnect()
 		}
+	case RPC_MSGID_HANDSHAKE:
+		handshake := &RPCHandShake{}
+		defaultCodec.Unmarshal(body, handshake)
+		c.EndName = handshake.EndName
+		c.EndModelName = handshake.EndModelName
 	case RPC_MSGID_CALL:
 		call := &RPCMethodCall{}
 		defaultCodec.Unmarshal(body, call)
@@ -215,7 +232,7 @@ func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 		args := Args{}
 		args.FromRPCMap(&call.Args)
 		ctx := &Context{conn: conn, callSeq: call.CallSeq, Method: call.Method, Args: args}
-		c.r.Invoke(c.endName, call.Method, ctx)
+		c.r.Invoke(c.EndName, call.Method, ctx)
 	case RPC_MSGID_RETURN:
 		ret := &RPCMethodReturn{}
 		defaultCodec.Unmarshal(body, ret)

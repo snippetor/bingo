@@ -29,6 +29,7 @@ message RPCValue {
 
 message RPCHandShake {
     required string endName = 1; // 来端名称
+    required string endModelName = 2; // 来端节点模型名称
 }
 
 message RPCMethodCall {

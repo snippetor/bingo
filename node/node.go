@@ -73,6 +73,7 @@ func init() {
 	config = &Config{}
 }
 
+// 解析配置文件
 func Parse(configPath string) {
 	content, err := ioutil.ReadFile(configPath)
 	if err != nil {
@@ -84,6 +85,11 @@ func Parse(configPath string) {
 		return
 	}
 	//TODO check
+}
+
+// 获取所有配置的节点
+func GetAllNodes() []*Node {
+	return config.Nodes
 }
 
 func findNode(name string) *Node {
@@ -179,14 +185,14 @@ func run_node(n *Node) {
 	// rpc
 	if n.RpcPort > 0 {
 		s := &rpc.Server{}
-		s.Listen(n.Name, n.RpcPort)
+		s.Listen(n, n.RpcPort)
 		m.setRPCServer(s)
 	}
 	for _, rpcServerNode := range n.RpcTo {
 		c := &rpc.Client{}
 		serverNode := findNode(rpcServerNode)
 		if serverNode != nil {
-			c.Connect(n.Name, config.Domains[serverNode.Domain]+":"+strconv.Itoa(serverNode.RpcPort))
+			c.Connect(n, config.Domains[serverNode.Domain]+":"+strconv.Itoa(serverNode.RpcPort))
 			m.putRPCClient(serverNode.Name, c)
 		}
 	}

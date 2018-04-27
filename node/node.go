@@ -179,7 +179,6 @@ func run_node(n *Node) {
 	m.setConfig(vm)
 
 	// init
-	m.init()
 	m.OnInit()
 
 	// rpc

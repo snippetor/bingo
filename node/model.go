@@ -35,7 +35,11 @@ type IModel interface {
 	OnReceiveServiceMessage(net.IConn, net.MessageId, net.MessageBody)
 	OnReceiveHttpServiceRequest(*fasthttp.RequestCtx)
 
-	init()
+	GetRPCModule() *RPCModule
+	GetServiceModule() *ServiceModule
+	GetLogModule() *LogModule
+	GetConfig() *utils.ValueMap
+
 	setNodeName(string)
 	setRPCServer(*rpc.Server)
 	putRPCClient(string, *rpc.Client)
@@ -193,19 +197,26 @@ func (m *LogModule) GetLogger(name string) *log.Logger {
 // model
 type Model struct {
 	nodeName string
-	LOG      *LogModule
-	RPC      *RPCModule
-	Service  *ServiceModule
-	Config   *utils.ValueMap
+	log      *LogModule
+	rpc      *RPCModule
+	service  *ServiceModule
+	config   *utils.ValueMap
 }
 
-func (m *Model) init() {
-	// init Log module
-	m.LOG = &LogModule{}
-	// init RPC module
-	m.RPC = &RPCModule{nodeName: m.nodeName, rpcRouter: &rpc.Router{}}
-	// init Service module
-	m.Service = &ServiceModule{}
+func (m *Model) GetRPCModule() *RPCModule {
+	return m.rpc
+}
+
+func (m *Model) GetServiceModule() *ServiceModule {
+	return m.service
+}
+
+func (m *Model) GetLogModule() *LogModule {
+	return m.log
+}
+
+func (m *Model) GetConfig() *utils.ValueMap {
+	return m.config
 }
 
 func (m *Model) setNodeName(name string) {
@@ -213,28 +224,28 @@ func (m *Model) setNodeName(name string) {
 }
 
 func (m *Model) putService(name string, s net.IServer) {
-	if m.Service.servers == nil {
-		m.Service.servers = make(map[string]net.IServer)
+	if m.service.servers == nil {
+		m.service.servers = make(map[string]net.IServer)
 	}
-	m.Service.servers[name] = s
+	m.service.servers[name] = s
 }
 
 func (m *Model) setRPCServer(serv *rpc.Server) {
-	serv.SetRouter(m.RPC.rpcRouter)
-	m.RPC.rpcServer = serv
+	serv.SetRouter(m.rpc.rpcRouter)
+	m.rpc.rpcServer = serv
 }
 
 func (m *Model) putRPCClient(name string, client *rpc.Client) {
-	client.SetRouter(m.RPC.rpcRouter)
-	m.RPC.rpcClients = append(m.RPC.rpcClients, client)
+	client.SetRouter(m.rpc.rpcRouter)
+	m.rpc.rpcClients = append(m.rpc.rpcClients, client)
 }
 
 func (m *Model) setConfig(config *utils.ValueMap) {
-	m.Config = config
+	m.config = config
 }
 
 func (m *Model) setLoggers(loggers map[string]*log.Logger) {
-	m.LOG.loggers = loggers
+	m.log.loggers = loggers
 }
 
 func (m *Model) destroy() {

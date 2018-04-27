@@ -190,3 +190,7 @@ func (c *Context) ReturnNil() {
 		fwlogger.E("-- return rpc method %s failed! send message failed --", c.Method)
 	}
 }
+
+func (c *Context) GetConnectionIdentify() utils.Identity {
+	return c.conn.Identity()
+}

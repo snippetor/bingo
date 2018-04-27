@@ -25,12 +25,12 @@ import (
 type MessageId int32
 type MessageBody []byte
 
-func (b MessageBody) ToJson(v interface{}) {
-	json.Unmarshal(b, v)
+func (b MessageBody) ToJson(v interface{}) bool {
+	return json.Unmarshal(b, v) == nil
 }
 
-func (b MessageBody) ToProtobuf(v interface{}) {
-	proto.Unmarshal(b, v.(proto.Message))
+func (b MessageBody) ToProtobuf(v interface{}) bool {
+	return proto.Unmarshal(b, v.(proto.Message)) == nil
 }
 
 func (b MessageBody) FromJson(v interface{}) {

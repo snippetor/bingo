@@ -21,7 +21,6 @@ import (
 	"time"
 	"github.com/snippetor/bingo/utils"
 	"github.com/snippetor/bingo/log/fwlogger"
-	"github.com/snippetor/bingo/node"
 )
 
 var (
@@ -39,7 +38,8 @@ type IEndStub interface {
 }
 
 type Server struct {
-	n          *node.Node
+	name       string
+	modelName  string
 	serv       net.IServer
 	clients    []*Client
 	l          *sync.RWMutex
@@ -48,8 +48,9 @@ type Server struct {
 	r          *Router
 }
 
-func (s *Server) Listen(node *node.Node, port int) {
-	s.n = node
+func (s *Server) Listen(name, modelName string, port int) {
+	s.name = name
+	s.modelName = modelName
 	s.l = &sync.RWMutex{}
 	s.identifier = utils.NewIdentifier(2)
 	if s.serv = net.GoListen(net.Tcp, port, s.handleMessage); s.serv == nil {
@@ -74,9 +75,9 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 		}
 	case RPC_MSGID_HANDSHAKE:
 		// ack handshake to RPC server
-		body := defaultCodec.Marshal(&RPCHandShake{EndName: s.n.Name, EndModelName: s.n.ModelName})
+		body := defaultCodec.Marshal(&RPCHandShake{EndName: s.name, EndModelName: s.modelName})
 		if !conn.Send(net.MessageId(RPC_MSGID_HANDSHAKE), body) {
-			fwlogger.E("-- send handshake %s failed! send message failed --", s.n.Name)
+			fwlogger.E("-- send handshake %s failed! send message failed --", s.name)
 		}
 		handshake := &RPCHandShake{}
 		defaultCodec.Unmarshal(body, handshake)
@@ -98,7 +99,7 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 		args := Args{}
 		args.FromRPCMap(&call.Args)
 		ctx := &Context{conn: conn, callSeq: call.CallSeq, Method: call.Method, Args: args}
-		s.r.Invoke(s.n.Name, call.Method, ctx)
+		s.r.Invoke(s.name, call.Method, ctx)
 	case RPC_MSGID_RETURN:
 		ret := &RPCMethodReturn{}
 		defaultCodec.Unmarshal(body, ret)
@@ -127,7 +128,8 @@ func (s *Server) SetRouter(router *Router) {
 }
 
 type Client struct {
-	n            *node.Node
+	name         string
+	modelName    string
 	EndName      string // 远端节点名称
 	EndModelName string // 远端节点模型名
 	conn         net.IConn
@@ -140,8 +142,9 @@ type Client struct {
 	r            *Router
 }
 
-func (c *Client) Connect(node *node.Node, serverAddress string) {
-	c.n = node
+func (c *Client) Connect(name, modelName string, serverAddress string) {
+	c.name = name
+	c.modelName = modelName
 	c.state = net.STATE_CONNECTING
 	c.addr = serverAddress
 	c.identifier = utils.NewIdentifier(3)
@@ -210,7 +213,7 @@ func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 	case RPC_MSGID(net.MSGID_CONNECT_CONNECTED):
 		fwlogger.D("-- %s connect RPC server success  --", c.EndName)
 		// send handshake to RPC server
-		body := defaultCodec.Marshal(&RPCHandShake{EndName: c.n.Name, EndModelName: c.n.ModelName})
+		body := defaultCodec.Marshal(&RPCHandShake{EndName: c.name, EndModelName: c.modelName})
 		if !conn.Send(net.MessageId(RPC_MSGID_HANDSHAKE), body) {
 			fwlogger.E("-- send handshake %s failed! send message failed --", c.EndName)
 		}

@@ -27,7 +27,7 @@ func (m *ValueMap) Has(key string) bool {
 	if m.inner == nil {
 		return false
 	}
-	if v, ok := m.inner[key]; ok {
+	if _, ok := m.inner[key]; ok {
 		return true
 	}
 	return false

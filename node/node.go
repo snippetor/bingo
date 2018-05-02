@@ -184,14 +184,14 @@ func run_node(n *Node) {
 	// rpc
 	if n.RpcPort > 0 {
 		s := &rpc.Server{}
-		s.Listen(n, n.RpcPort)
+		s.Listen(n.Name, n.ModelName, n.RpcPort)
 		m.setRPCServer(s)
 	}
 	for _, rpcServerNode := range n.RpcTo {
 		c := &rpc.Client{}
 		serverNode := findNode(rpcServerNode)
 		if serverNode != nil {
-			c.Connect(n, config.Domains[serverNode.Domain]+":"+strconv.Itoa(serverNode.RpcPort))
+			c.Connect(n.Name, n.ModelName, config.Domains[serverNode.Domain]+":"+strconv.Itoa(serverNode.RpcPort))
 			m.putRPCClient(serverNode.Name, c)
 		}
 	}

@@ -87,22 +87,23 @@ func (a *Args) ToRPCMap(m *map[string]*RPCValue) {
 			value := reflect.ValueOf(v.Get())
 			l := value.Len()
 			if l > 0 {
-				switch value.Index(0).(type) {
-				case int32:
+				t := value.Index(0).Type()
+				switch t.Kind() {
+				case reflect.Int32:
 					(*m)[k] = &RPCValue{Kind: TYPE_INT32_ARRAY, I32A: v.GetInt32Array()}
-				case int64:
+				case reflect.Int64:
 					(*m)[k] = &RPCValue{Kind: TYPE_INT64_ARRAY, I64A: v.GetInt64Array()}
-				case uint32:
+				case reflect.Uint32:
 					(*m)[k] = &RPCValue{Kind: TYPE_UINT32_ARRAY, U32A: v.GetUint32Array()}
-				case uint64:
+				case reflect.Uint64:
 					(*m)[k] = &RPCValue{Kind: TYPE_UINT64_ARRAY, U64A: v.GetUint64Array()}
-				case float32:
+				case reflect.Float32:
 					(*m)[k] = &RPCValue{Kind: TYPE_FLOAT32_ARRAY, F32A: v.GetFloat32Array()}
-				case float64:
+				case reflect.Float64:
 					(*m)[k] = &RPCValue{Kind: TYPE_FLOAT64_ARRAY, F64A: v.GetFloat64Array()}
-				case string:
+				case reflect.String:
 					(*m)[k] = &RPCValue{Kind: TYPE_STRING_ARRAY, Sa: v.GetStringArray()}
-				case bool:
+				case reflect.Bool:
 					(*m)[k] = &RPCValue{Kind: TYPE_BOOL_ARRAY, Ba: v.GetBoolArray()}
 				}
 			}

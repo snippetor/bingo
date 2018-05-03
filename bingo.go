@@ -28,7 +28,9 @@ import (
 )
 
 var (
+	c          = flag.String("c", "", "config file path")
 	n          = flag.String("n", "", "startup which node, with its name")
+	d          = flag.String("d", "", "stop which node, with its name")
 	proc       = flag.Int("p", -1, "cpu core size for runtime.GOMAXPROCS, default is runtime.NumCPU")
 	help       = flag.Bool("h", false, "help")
 	version    = flag.Bool("v", false, "bingo framework version")
@@ -36,13 +38,13 @@ var (
 	usage      = `
 	 Usage:
 	 *if archive file name is echo
-	 echo [command] [config file] [options]
-
-	 Command:
-	 start : startup node
-	 stop  : stop node
+	 echo [options]
+	 Or
+	 go run echo.go [options]
 
 	 Options:
+	 -c : config file
+     -d : stop the node
 	 -n : operate which node, with its name, if not set -n, all nodes will be operated
 	 -p : cpu core size for runtime.GOMAXPROCS, default is runtime.NumCPU
 	 -h : help
@@ -52,7 +54,9 @@ var (
 	 1. startup master node with config file bingo.json
 	 echo -c bingo.json -n master
 	 2. startup all nodes with config file bingo.json
-	 echo start bingo.json -a or echo start bingo.json
+	 echo -c bingo.json
+	 3. stop master node
+	 echo -c bingo.json -d master
 	`
 	commands = []string{"start", "stop"}
 )
@@ -80,6 +84,7 @@ func Run() {
 		fmt.Println(usage)
 		return
 	}
+
 	cmd := strings.ToLower(os.Args[1])
 	config := os.Args[2]
 
@@ -95,6 +100,7 @@ func Run() {
 
 	flag.Parse()
 
+	fmt.Println(flag.Args())
 	n := *n
 	proc := *proc
 	help := *help

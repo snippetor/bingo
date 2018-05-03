@@ -40,6 +40,7 @@ type IModel interface {
 	GetLogModule() *LogModule
 	GetConfig() *utils.ValueMap
 
+	initModules()
 	setNodeName(string)
 	setRPCServer(*rpc.Server)
 	putRPCClient(string, *rpc.Client)
@@ -191,7 +192,8 @@ func (m *LogModule) GetLogger(name string) *log.Logger {
 			return logger
 		}
 	}
-	return nil
+	logger := log.NewLoggerWithConfig(log.DEFAULT_CONFIG)
+	return logger
 }
 
 // model
@@ -201,6 +203,15 @@ type Model struct {
 	rpc      *RPCModule
 	service  *ServiceModule
 	config   *utils.ValueMap
+}
+
+func (m *Model) initModules() {
+	// init log module
+	m.log = &LogModule{}
+	// init RPC module
+	m.rpc = &RPCModule{nodeName: m.nodeName, rpcRouter: &rpc.Router{}}
+	// init Service module
+	m.service = &ServiceModule{}
 }
 
 func (m *Model) GetRPCModule() *RPCModule {

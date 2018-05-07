@@ -140,20 +140,21 @@ type Client struct {
 	callSyncWorker
 	forceClose   bool
 	r            *Router
+	tcpClient    net.IClient
 }
 
-func (c *Client) Connect(name, modelName string, serverAddress string) {
+func (c *Client) Connect(name, modelName, serverAddress string) {
 	c.name = name
 	c.modelName = modelName
 	c.state = net.STATE_CONNECTING
 	c.addr = serverAddress
 	c.identifier = utils.NewIdentifier(3)
 	c.l = &sync.RWMutex{}
-	if net.GoConnect(net.Tcp, serverAddress, c.handleMessage) == nil {
+	if client := net.GoConnect(net.Tcp, serverAddress, c.handleMessage); client == nil {
 		c.state = net.STATE_CLOSED
-		c.reconnect()
 	} else {
 		c.state = net.STATE_CONNECTED
+		c.tcpClient = client
 	}
 }
 
@@ -248,13 +249,8 @@ func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 
 func (c *Client) reconnect() {
 	if net.STATE_CLOSED == c.state {
+		time.Sleep(5 * time.Second)
 		fwlogger.D("@reconnect RPC, remote address=%s", c.addr)
-		if net.GoConnect(net.Tcp, c.addr, c.handleMessage) == nil {
-			time.Sleep(1 * time.Second)
-			c.state = net.STATE_CLOSED
-			c.reconnect()
-		} else {
-			c.state = net.STATE_CONNECTED
-		}
+		c.tcpClient.Reconnect()
 	}
 }

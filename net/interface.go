@@ -45,6 +45,14 @@ func (b MessageBody) FromProtobuf(v interface{}) {
 	copy(b, res)
 }
 
+func (i MessageId) Int32() int32 {
+	return int32(i)
+}
+
+func (i MessageId) Int() int {
+	return int(i)
+}
+
 const (
 	MSGID_CONNECT_DISCONNECT = -1
 	MSGID_CONNECT_CONNECTED  = -2
@@ -85,6 +93,7 @@ type IClient interface {
 	connect(string, IMessageCallback) bool
 	Send(msgId MessageId, body MessageBody) bool
 	Close()
+	Reconnect()
 }
 
 type ConnState int

@@ -16,7 +16,6 @@ package fwlogger
 
 import (
 	"github.com/snippetor/bingo/log"
-	"time"
 )
 
 var (
@@ -34,7 +33,7 @@ func init() {
 		LogFileNameDatePattern: "20060102",
 		LogFileNameExt:         ".log",
 		LogFileMaxSize:         1 * log.GB,
-		LogFileScanInterval:    10 * time.Minute,
+		LogFileScanInterval:    600,
 	})
 }
 

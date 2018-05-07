@@ -118,7 +118,7 @@ func (m *RPCModule) GetEndStubsWithModelName(nodeModelName string) []rpc.IEndStu
 
 // 通过名称前缀和平衡因子获取stub
 // 如果有多个stub，则通过取模算法（balancingSeed % (stubs size)）来决定使用哪个
-func (m *RPCModule) GetEndStubWithPrefixAndBalancingSeed(nodeNamePrefix string, balancingSeed int64) (rpc.IEndStub, bool) {
+func (m *RPCModule) GetEndStubWithPrefixAndBalancingSeed(nodeNamePrefix string, balancingSeed uint32) (rpc.IEndStub, bool) {
 	stubs := m.GetEndStubsWithPrefix(nodeNamePrefix)
 	len := len(stubs)
 	if len == 0 {
@@ -126,13 +126,13 @@ func (m *RPCModule) GetEndStubWithPrefixAndBalancingSeed(nodeNamePrefix string, 
 	} else if len == 1 {
 		return stubs[0], true
 	} else {
-		return stubs[balancingSeed%int64(len)], true
+		return stubs[balancingSeed%uint32(len)], true
 	}
 }
 
 // 通过节点模型名称和平衡因子获取stub
 // 如果有多个stub，则通过取模算法（balancingSeed % (stubs size)）来决定使用哪个
-func (m *RPCModule) GetEndStubWithModelNameAndBalancingSeed(nodeModelName string, balancingSeed int64) (rpc.IEndStub, bool) {
+func (m *RPCModule) GetEndStubWithModelNameAndBalancingSeed(nodeModelName string, balancingSeed uint32) (rpc.IEndStub, bool) {
 	stubs := m.GetEndStubsWithModelName(nodeModelName)
 	len := len(stubs)
 	if len == 0 {
@@ -140,7 +140,7 @@ func (m *RPCModule) GetEndStubWithModelNameAndBalancingSeed(nodeModelName string
 	} else if len == 1 {
 		return stubs[0], true
 	} else {
-		return stubs[balancingSeed%int64(len)], true
+		return stubs[balancingSeed%uint32(len)], true
 	}
 }
 
@@ -192,7 +192,10 @@ func (m *LogModule) GetLogger(name string) *log.Logger {
 			return logger
 		}
 	}
-	logger := log.NewLoggerWithConfig(log.DEFAULT_CONFIG)
+	logger := log.NewLoggerWithConfig(&log.Config{
+		Level:      log.Info,
+		OutputType: log.Console,
+	})
 	return logger
 }
 

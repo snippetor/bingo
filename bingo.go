@@ -19,8 +19,6 @@ import (
 	"flag"
 	"runtime"
 	"os"
-	"sort"
-	"strings"
 	"github.com/snippetor/bingo/node"
 	"path/filepath"
 	"github.com/snippetor/bingo/log"
@@ -29,8 +27,8 @@ import (
 
 var (
 	c          = flag.String("c", "", "config file path")
+	d          = flag.Bool("d", false, "stop which node, with its name")
 	n          = flag.String("n", "", "startup which node, with its name")
-	d          = flag.String("d", "", "stop which node, with its name")
 	proc       = flag.Int("p", -1, "cpu core size for runtime.GOMAXPROCS, default is runtime.NumCPU")
 	help       = flag.Bool("h", false, "help")
 	version    = flag.Bool("v", false, "bingo framework version")
@@ -44,7 +42,7 @@ var (
 
 	 Options:
 	 -c : config file
-     -d : stop the node
+	 -d : stop the node
 	 -n : operate which node, with its name, if not set -n, all nodes will be operated
 	 -p : cpu core size for runtime.GOMAXPROCS, default is runtime.NumCPU
 	 -h : help
@@ -56,13 +54,12 @@ var (
 	 2. startup all nodes with config file bingo.json
 	 echo -c bingo.json
 	 3. stop master node
-	 echo -c bingo.json -d master
+	 echo -c bingo.json -n master -d
 	`
-	commands = []string{"start", "stop"}
 )
 
 func Version() string {
-	return "1.0"
+	return "v1.0"
 }
 
 func BindNodeModel(modelName string, model interface{}) {
@@ -74,33 +71,10 @@ func SetLogLevel(level log.Level) {
 }
 
 func Run() {
-
-	if len(os.Args) == 1 {
-		fmt.Println(usage)
-		return
-	}
-
-	if len(os.Args) < 3 {
-		fmt.Println(usage)
-		return
-	}
-
-	cmd := strings.ToLower(os.Args[1])
-	config := os.Args[2]
-
-	if sort.SearchStrings(commands, cmd) < 0 {
-		fmt.Println("command must be one of", commands)
-		return
-	}
-
-	if config == "" {
-		fmt.Println("config file must be set")
-		return
-	}
-
 	flag.Parse()
 
-	fmt.Println(flag.Args())
+	c := *c
+	d := *d
 	n := *n
 	proc := *proc
 	help := *help
@@ -111,7 +85,13 @@ func Run() {
 		return
 	}
 	if version {
-		fmt.Println(Version())
+		fmt.Println("Bingo version: " + Version())
+		return
+	}
+
+	if c == "" {
+		fmt.Println("config file must be set")
+		fmt.Println(usage)
 		return
 	}
 
@@ -121,24 +101,27 @@ func Run() {
 		runtime.GOMAXPROCS(proc)
 	}
 
-	if filepath.IsAbs(config) {
-		node.Parse(config)
+	if filepath.IsAbs(c) {
+		node.Parse(c)
 	} else {
 		if dir, err := os.Getwd(); err == nil {
-			node.Parse(filepath.Join(dir, config))
+			node.Parse(filepath.Join(dir, c))
 		}
 	}
 
-	switch cmd {
-	case "start":
+	if d {
+
+	} else {
 		if n == "" {
 			node.RunAll()
 		} else {
 			node.Run(n)
 		}
-	case "stop":
 	}
 
-	<-endRunning
-	node.StopAll()
+	select {
+	case <-endRunning:
+		node.StopAll()
+	}
+	//<-endRunning
 }

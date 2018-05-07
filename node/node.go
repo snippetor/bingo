@@ -25,7 +25,6 @@ import (
 	"github.com/snippetor/bingo/log/fwlogger"
 	"github.com/snippetor/bingo/utils"
 	"github.com/snippetor/bingo/log"
-	"time"
 )
 
 type Service struct {
@@ -109,6 +108,7 @@ func run_node(n *Node) {
 		return
 	}
 	m.setNodeName(n.Name)
+	m.initModules()
 
 	// log
 	/**
@@ -130,7 +130,7 @@ func run_node(n *Node) {
 				OutputType:             log.OutputType(c.OutputType),
 				LogFileOutputDir:       log.DEFAULT_CONFIG.LogFileOutputDir,
 				LogFileRollingType:     log.RollingType(c.RollingType),
-				LogFileScanInterval:    time.Duration(c.FileScanInterval),
+				LogFileScanInterval:    c.FileScanInterval,
 				LogFileName:            log.DEFAULT_CONFIG.LogFileName,
 				LogFileNameDatePattern: log.DEFAULT_CONFIG.LogFileNameDatePattern,
 				LogFileNameExt:         log.DEFAULT_CONFIG.LogFileNameExt,
@@ -179,7 +179,6 @@ func run_node(n *Node) {
 	m.setConfig(vm)
 
 	// init
-	m.initModules()
 	m.OnInit()
 
 	// rpc
@@ -225,10 +224,12 @@ func run_node(n *Node) {
 			m.putService(s.Name, serv)
 		case "http":
 			go func() {
+				fwlogger.D("-- http service start on %s --", strconv.Itoa(s.Port))
 				if err := fasthttp.ListenAndServe(":"+strconv.Itoa(s.Port), func(ctx *fasthttp.RequestCtx) {
+					fwlogger.D("====> %s %s", string(ctx.Path()), string(ctx.Request.Body()))
 					m.OnReceiveHttpServiceRequest(ctx)
 				}); err != nil {
-					fwlogger.E("-- startup http service failed! %s --", err)
+					fwlogger.E("-- startup http service failed! %s --", err.Error())
 				}
 			}()
 		}

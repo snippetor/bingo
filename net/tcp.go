@@ -155,18 +155,28 @@ func (s *tcpServer) Close() {
 type tcpClient struct {
 	comm.Configable
 	sync.Mutex
-	conn IConn
+	serverAddr string
+	callback   IMessageCallback
+	conn       IConn
+}
+
+func (c *tcpClient) Reconnect() {
+	c.connect(c.serverAddr, c.callback)
 }
 
 func (c *tcpClient) connect(serverAddr string, callback IMessageCallback) bool {
+	c.serverAddr = serverAddr
+	c.callback = callback
 	addr, err := net.ResolveTCPAddr("tcp", serverAddr)
 	if err != nil {
 		fwlogger.E(err.Error())
+		callback(nil, MSGID_CONNECT_DISCONNECT, nil)
 		return false
 	}
 	conn, err := net.DialTCP("tcp", nil, addr)
 	if err != nil {
 		fwlogger.E(err.Error())
+		callback(nil, MSGID_CONNECT_DISCONNECT, nil)
 		return false
 	}
 	defer conn.Close()

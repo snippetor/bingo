@@ -143,14 +143,23 @@ func (s *wsServer) GetConnection(identity utils.Identity) (IConn, bool) {
 type wsClient struct {
 	comm.Configable
 	sync.Mutex
-	conn IConn
+	serverAddr string
+	callback   IMessageCallback
+	conn       IConn
+}
+
+func (c *wsClient) Reconnect() {
+	c.connect(c.serverAddr, c.callback)
 }
 
 func (c *wsClient) connect(serverAddr string, callback IMessageCallback) bool {
+	c.serverAddr = serverAddr
+	c.callback = callback
 	conn, _, err := websocket.DefaultDialer.Dial(serverAddr, nil)
 	fwlogger.I("Ws connect server ok :%s", serverAddr)
 	if err != nil {
 		fwlogger.E(err.Error())
+		callback(nil, MSGID_CONNECT_DISCONNECT, nil)
 		return false
 	}
 	c.conn = IConn(&wsConn{conn: conn})

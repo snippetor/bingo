@@ -36,8 +36,8 @@ type Config struct {
 	LogFileName            string
 	LogFileNameDatePattern string
 	LogFileNameExt         string
-	LogFileMaxSize         int64         // 字节
-	LogFileScanInterval    time.Duration // 秒
+	LogFileMaxSize         int64 // 字节
+	LogFileScanInterval    int   // 秒
 }
 
 type Level int
@@ -78,7 +78,7 @@ var DEFAULT_CONFIG = &Config{
 	LogFileNameDatePattern: "20060102",
 	LogFileNameExt:         ".log",
 	LogFileMaxSize:         500 * MB,
-	LogFileScanInterval:    10 * time.Minute,
+	LogFileScanInterval:    600,
 }
 
 type Logger struct {
@@ -128,13 +128,13 @@ func (l *Logger) init() {
 			s := <-l.c
 			if l.config.OutputType&Console == Console {
 				if s.level == Info {
-					fmt.Println("\x1B[0;32m" + time.Now().Format("15:04:05") + " " + s.content + "\x1B[0m")
+					fmt.Println("\x1B[0;32m" + time.Now().Format("15:04:05.9999999") + " " + s.content + "\x1B[0m")
 				} else if s.level == Debug {
-					fmt.Println("\x1B[0;34m" + time.Now().Format("15:04:05") + " " + s.content + "\x1B[0m")
+					fmt.Println("\x1B[0;34m" + time.Now().Format("15:04:05.9999999") + " " + s.content + "\x1B[0m")
 				} else if s.level == Warning {
-					fmt.Println("\x1B[0;33m" + time.Now().Format("15:04:05") + " " + s.content + "\x1B[0m")
+					fmt.Println("\x1B[0;33m" + time.Now().Format("15:04:05.9999999") + " " + s.content + "\x1B[0m")
 				} else if s.level == Error {
-					fmt.Println("\x1B[0;31m" + time.Now().Format("15:04:05") + " " + s.content + "\x1B[0m")
+					fmt.Println("\x1B[0;31m" + time.Now().Format("15:04:05.9999999") + " " + s.content + "\x1B[0m")
 				}
 			}
 			if l.config.OutputType&File == File {
@@ -185,14 +185,16 @@ func (l *Logger) setConfigFile(configFile string) {
 			}
 		}
 	}
-	c.LogFileScanInterval = time.Duration(ini.MustInt(mode, "logFileScanInterval", 1)) * time.Second
+	c.LogFileScanInterval = ini.MustInt(mode, "logFileScanInterval", 1)
 	l.setConfig(c)
 }
 
 func (l *Logger) setConfig(c *Config) {
 	l.config = c
 	//l.makeFile()
-	l.startFileCheckMonitor()
+	if c.OutputType&File == File {
+		l.startFileCheckMonitor()
+	}
 }
 
 func (l *Logger) SetPrefixes(prefix ...string) {
@@ -257,7 +259,7 @@ func (l *Logger) startFileCheckMonitor() {
 	l.isMonitorRunning = true
 	// file check monitor
 	go func() {
-		monitorTimer := time.NewTicker(l.config.LogFileScanInterval)
+		monitorTimer := time.NewTicker(time.Duration(l.config.LogFileScanInterval) * time.Second)
 		for {
 			select {
 			case <-monitorTimer.C:
@@ -269,7 +271,7 @@ func (l *Logger) startFileCheckMonitor() {
 
 // 初始化日志文件
 func (l *Logger) makeFile() {
-	if l.config.OutputType == Console {
+	if l.config.OutputType&File != File {
 		return
 	}
 	if l.f == nil {
@@ -307,7 +309,7 @@ func (l *Logger) makeFile() {
 
 // 检查文件是否需要重新创建
 func (l *Logger) checkFile() {
-	if l.config.OutputType == Console || l.f == nil {
+	if l.config.OutputType&File != File || l.f == nil {
 		return
 	}
 	needRecreate, newFileName := false, l.config.LogFileName

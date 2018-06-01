@@ -125,16 +125,15 @@ func run_node(n *Node) {
 	if n.LogConfigs != nil {
 		loggers := make(map[string]*log.Logger)
 		for _, c := range n.LogConfigs {
-			config := &log.Config{
-				Level:                  log.Level(c.Level),
-				OutputType:             log.OutputType(c.OutputType),
-				LogFileOutputDir:       log.DEFAULT_CONFIG.LogFileOutputDir,
-				LogFileRollingType:     log.RollingType(c.RollingType),
-				LogFileScanInterval:    c.FileScanInterval,
-				LogFileName:            log.DEFAULT_CONFIG.LogFileName,
-				LogFileNameDatePattern: log.DEFAULT_CONFIG.LogFileNameDatePattern,
-				LogFileNameExt:         log.DEFAULT_CONFIG.LogFileNameExt,
-				LogFileMaxSize:         log.DEFAULT_CONFIG.LogFileMaxSize,
+			config := log.DEFAULT_CONFIG
+			if c.Level != 0 {
+				config.Level = log.Level(c.Level)
+			}
+			if c.OutputType != 0 {
+				config.OutputType = log.OutputType(c.OutputType)
+			}
+			if c.RollingType != 0 {
+				config.LogFileRollingType = log.RollingType(c.RollingType)
 			}
 			if c.OutputDir != "" {
 				config.LogFileOutputDir = c.OutputDir
@@ -165,6 +164,9 @@ func run_node(n *Node) {
 						}
 					}
 				}
+			}
+			if c.FileScanInterval != 0 {
+				config.LogFileScanInterval = c.FileScanInterval
 			}
 			loggers[c.Name] = log.NewLoggerWithConfig(config)
 		}

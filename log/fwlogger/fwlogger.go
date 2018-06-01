@@ -33,7 +33,7 @@ func init() {
 		LogFileNameDatePattern: "20060102",
 		LogFileNameExt:         ".log",
 		LogFileMaxSize:         1 * log.GB,
-		LogFileScanInterval:    600,
+		LogFileScanInterval:    60,
 	})
 }
 

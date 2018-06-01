@@ -78,7 +78,7 @@ var DEFAULT_CONFIG = &Config{
 	LogFileNameDatePattern: "20060102",
 	LogFileNameExt:         ".log",
 	LogFileMaxSize:         500 * MB,
-	LogFileScanInterval:    600,
+	LogFileScanInterval:    60,
 }
 
 type Logger struct {

@@ -81,7 +81,19 @@ var DEFAULT_CONFIG = &Config{
 	LogFileScanInterval:    60,
 }
 
-type Logger struct {
+type Logger interface {
+	SetLevel(level Level)
+	SetPrefixes(prefix ...string)
+	I(format string, v ...interface{})
+	D(format string, v ...interface{})
+	W(format string, v ...interface{})
+	E(format string, v ...interface{})
+	Close()
+}
+
+var _ Logger = (*logger)(nil)
+
+type logger struct {
 	config *Config
 	// 内置logger
 	lg *log.Logger
@@ -100,27 +112,27 @@ type OutputLog struct {
 	content string
 }
 
-func NewLogger(configFile string) *Logger {
+func NewLogger(configFile string) Logger {
 	// 默认配置
-	l := &Logger{}
+	l := &logger{}
 	l.setConfigFile(configFile)
 	l.init()
 	return l
 }
 
-func NewLoggerWithConfig(config *Config) *Logger {
+func NewLoggerWithConfig(config *Config) Logger {
 	// 默认配置
-	l := &Logger{}
+	l := &logger{}
 	l.setConfig(config)
 	l.init()
 	return l
 }
 
-func (l *Logger) SetLevel(level Level) {
+func (l *logger) SetLevel(level Level) {
 	l.config.Level = level
 }
 
-func (l *Logger) init() {
+func (l *logger) init() {
 	l.c = make(chan *OutputLog, 5000)
 	// log write
 	go func() {
@@ -147,7 +159,7 @@ func (l *Logger) init() {
 	}()
 }
 
-func (l *Logger) setConfigFile(configFile string) {
+func (l *logger) setConfigFile(configFile string) {
 	ini, err := goconfig.LoadConfigFile(configFile)
 	if err != nil {
 		log.Println("=========== parse config file failed!!! ==========", err)
@@ -189,7 +201,7 @@ func (l *Logger) setConfigFile(configFile string) {
 	l.setConfig(c)
 }
 
-func (l *Logger) setConfig(c *Config) {
+func (l *logger) setConfig(c *Config) {
 	l.config = c
 	//l.makeFile()
 	if c.OutputType&File == File {
@@ -197,11 +209,11 @@ func (l *Logger) setConfig(c *Config) {
 	}
 }
 
-func (l *Logger) SetPrefixes(prefix ...string) {
+func (l *logger) SetPrefixes(prefix ...string) {
 	l.prefixes = prefix
 }
 
-func (l *Logger) formatPrefixes() string {
+func (l *logger) formatPrefixes() string {
 	var buf bytes.Buffer
 	if len(l.prefixes) > 0 {
 		for _, p := range l.prefixes {
@@ -212,7 +224,7 @@ func (l *Logger) formatPrefixes() string {
 	return buf.String()
 }
 
-func (l *Logger) I(format string, v ...interface{}) {
+func (l *logger) I(format string, v ...interface{}) {
 	if Info >= l.config.Level {
 		if len(v) == 0 {
 			l.c <- &OutputLog{Info, "[I] " + l.formatPrefixes() + format}
@@ -222,7 +234,7 @@ func (l *Logger) I(format string, v ...interface{}) {
 	}
 }
 
-func (l *Logger) D(format string, v ...interface{}) {
+func (l *logger) D(format string, v ...interface{}) {
 	if Debug >= l.config.Level {
 		if len(v) == 0 {
 			l.c <- &OutputLog{Debug, "[D] " + l.formatPrefixes() + format}
@@ -232,7 +244,7 @@ func (l *Logger) D(format string, v ...interface{}) {
 	}
 }
 
-func (l *Logger) W(format string, v ...interface{}) {
+func (l *logger) W(format string, v ...interface{}) {
 	if Warning >= l.config.Level {
 		if len(v) == 0 {
 			l.c <- &OutputLog{Warning, "[W] " + l.formatPrefixes() + format}
@@ -242,7 +254,7 @@ func (l *Logger) W(format string, v ...interface{}) {
 	}
 }
 
-func (l *Logger) E(format string, v ...interface{}) {
+func (l *logger) E(format string, v ...interface{}) {
 	if Error >= l.config.Level {
 		if len(v) == 0 {
 			l.c <- &OutputLog{Error, "[E] " + l.formatPrefixes() + format}
@@ -252,7 +264,7 @@ func (l *Logger) E(format string, v ...interface{}) {
 	}
 }
 
-func (l *Logger) startFileCheckMonitor() {
+func (l *logger) startFileCheckMonitor() {
 	if l.isMonitorRunning {
 		return
 	}
@@ -270,7 +282,7 @@ func (l *Logger) startFileCheckMonitor() {
 }
 
 // 初始化日志文件
-func (l *Logger) makeFile() {
+func (l *logger) makeFile() {
 	if l.config.OutputType&File != File {
 		return
 	}
@@ -308,7 +320,7 @@ func (l *Logger) makeFile() {
 }
 
 // 检查文件是否需要重新创建
-func (l *Logger) checkFile() {
+func (l *logger) checkFile() {
 	if l.config.OutputType&File != File || l.f == nil {
 		return
 	}
@@ -370,7 +382,7 @@ func (l *Logger) checkFile() {
 }
 
 // 获取下一个文件序列号
-func (l *Logger) getNextFileSeq(fileNamePrefix string) string {
+func (l *logger) getNextFileSeq(fileNamePrefix string) string {
 	if files, err := ioutil.ReadDir(l.config.LogFileOutputDir); err != nil {
 		return "1"
 	} else {
@@ -387,5 +399,11 @@ func (l *Logger) getNextFileSeq(fileNamePrefix string) string {
 			}
 		}
 		return strconv.FormatInt(maxFileSeq+1, 10)
+	}
+}
+
+func (l *logger) Close() {
+	if l.f != nil {
+		l.f.Close()
 	}
 }

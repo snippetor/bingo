@@ -2,16 +2,16 @@
   "domains": [
     "192.168.1.128"
   ],
-  "nodes": [
+  "apps": [
     {
       "name": "master",
-      "model": "master",
+      "app": "master",
       "domain": 0,
-      "rpc-port": 9092
+      "rpcPort": 9092
     },
     {
       "name": "auth",
-      "model": "auth",
+      "app": "auth",
       "domain": 0,
       "service": [
         {
@@ -23,7 +23,7 @@
     },
     {
       "name": "gate1",
-      "model": "gate",
+      "app": "gate",
       "domain": 0,
       "service": [
         {
@@ -32,10 +32,12 @@
           "port": 9090
         }
       ],
-      "rpc-port": 9091,
-      "rpc-to": [
-        "master"
-      ],
+      "rpc": {
+        "port": 9091,
+        "to": [
+          "master"
+        ]
+      },
       "log": [
         {
           "name": "error",
@@ -70,12 +72,14 @@
     },
     {
       "name": "game1",
-      "model": "game",
+      "app": "game",
       "domain": 0,
-      "rpc-to": [
-        "master",
-        "gate1"
-      ]
+      "rpc": {
+        "to": [
+          "master",
+          "gate1"
+        ]
+      }
     }
   ]
 }

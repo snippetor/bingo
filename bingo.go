@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"github.com/snippetor/bingo/log"
 	"github.com/snippetor/bingo/log/fwlogger"
+	"github.com/snippetor/bingo/app"
 )
 
 var (
@@ -63,7 +64,7 @@ func Version() string {
 }
 
 func BindNodeModel(modelName string, model interface{}) {
-	node.BindNodeModel(modelName, model.(node.IModel))
+	app.BindNodeModel(modelName, model.(app.IModel))
 }
 
 func SetLogLevel(level log.Level) {
@@ -102,10 +103,10 @@ func Run() {
 	}
 
 	if filepath.IsAbs(c) {
-		node.Parse(c)
+		app.Parse(c)
 	} else {
 		if dir, err := os.Getwd(); err == nil {
-			node.Parse(filepath.Join(dir, c))
+			app.Parse(filepath.Join(dir, c))
 		}
 	}
 
@@ -113,15 +114,15 @@ func Run() {
 
 	} else {
 		if n == "" {
-			node.RunAll()
+			app.RunAll()
 		} else {
-			node.Run(n)
+			app.Run(n)
 		}
 	}
 
 	select {
 	case <-endRunning:
-		node.StopAll()
+		app.StopAll()
 	}
 	//<-endRunning
 }

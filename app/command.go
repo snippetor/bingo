@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package node
+package app
 
 import (
 	"io/ioutil"
@@ -34,20 +34,9 @@ type Service struct {
 	Codec string
 }
 
-type Node struct {
-	Name       string
-	ModelName  string                 `json:"model"`
-	Domain     int
-	Services   []*Service             `json:"service"`
-	RpcPort    int                    `json:"rpc-port"`
-	RpcTo      []string               `json:"rpc-to"`
-	Config     map[string]interface{} `json:"config"`
-	LogConfigs []LogConfig            `json:"log"`
-}
-
-type Config struct {
-	Domains []string `json:"domains"`
-	Nodes   []*Node  `json:"nodes"`
+type RPC struct {
+	Port int      `json:"port"`
+	To   []string `json:"to"`
 }
 
 type LogConfig struct {
@@ -63,9 +52,24 @@ type LogConfig struct {
 	FileScanInterval    int
 }
 
+type App struct {
+	Name       string
+	ModelName  string                 `json:"app"`
+	Domain     int
+	Services   []*Service             `json:"service"`
+	Rpc        []*RPC                 `json:"rpc"`
+	Config     map[string]interface{} `json:"config"`
+	LogConfigs []*LogConfig           `json:"log"`
+}
+
+type Config struct {
+	Domains []string `json:"domains"`
+	Apps    []*App   `json:"apps"`
+}
+
 var (
 	config *Config
-	nodes  = make(map[string]*IModel, 0)
+	apps   = make(map[string]Application)
 )
 
 func init() {
@@ -86,13 +90,8 @@ func Parse(configPath string) {
 	//TODO check
 }
 
-// 获取所有配置的节点
-func GetAllNodes() []*Node {
-	return config.Nodes
-}
-
-func findNode(name string) *Node {
-	for _, n := range config.Nodes {
+func findApp(name string) *App {
+	for _, n := range config.Apps {
 		if n.Name == name {
 			return n
 		}
@@ -100,14 +99,14 @@ func findNode(name string) *Node {
 	return nil
 }
 
-func run_node(n *Node) {
-	// create node
-	m, ok := getNodeModel(n.ModelName)
+func runApp(n *App) {
+	// create app
+	m, ok := getappModel(n.ModelName)
 	if !ok {
 		fwlogger.E("-- not found model by name %s --", n.ModelName)
 		return
 	}
-	m.setNodeName(n.Name)
+	m.setappName(n.Name)
 	m.initModules()
 
 	// log
@@ -189,12 +188,12 @@ func run_node(n *Node) {
 		s.Listen(n.Name, n.ModelName, n.RpcPort)
 		m.setRPCServer(s)
 	}
-	for _, rpcServerNode := range n.RpcTo {
+	for _, rpcServerapp := range n.RpcTo {
 		c := &rpc.Client{}
-		serverNode := findNode(rpcServerNode)
-		if serverNode != nil {
-			c.Connect(n.Name, n.ModelName, config.Domains[serverNode.Domain]+":"+strconv.Itoa(serverNode.RpcPort))
-			m.putRPCClient(serverNode.Name, c)
+		serverapp := findApp(rpcServerapp)
+		if serverapp != nil {
+			c.Connect(n.Name, n.ModelName, config.Domains[serverapp.Domain]+":"+strconv.Itoa(serverapp.RpcPort))
+			m.putRPCClient(serverapp.Name, c)
 		}
 	}
 	// service
@@ -237,39 +236,39 @@ func run_node(n *Node) {
 		}
 	}
 
-	nodes[n.Name] = &m
+	apps[n.Name] = &m
 }
 
-func Run(nodeName string) {
-	n := findNode(nodeName)
+func Run(appName string) {
+	n := findApp(appName)
 	if n == nil {
-		fwlogger.E("-- run node failed! not found node by name %s --", nodeName)
+		fwlogger.E("-- run app failed! not found app by name %s --", appName)
 		return
 	}
-	run_node(n)
+	runApp(n)
 }
 
-func Stop(nodeName string) {
-	n := findNode(nodeName)
+func Stop(appName string) {
+	n := findApp(appName)
 	if n == nil {
-		fwlogger.E("-- stop node failed! not found node by name %s --", nodeName)
+		fwlogger.E("-- stop app failed! not found app by name %s --", appName)
 		return
 	}
-	if m, ok := nodes[nodeName]; ok {
-		(*m).destroy()
+	if m, ok := apps[appName]; ok {
+		m.destroy()
 	}
 }
 
 func RunAll() {
-	for _, n := range config.Nodes {
-		run_node(n)
+	for _, n := range config.Apps {
+		runApp(n)
 	}
 }
 
 func StopAll() {
-	for _, m := range nodes {
+	for _, m := range apps {
 		if m != nil {
-			(*m).destroy()
+			m.destroy()
 		}
 	}
 }

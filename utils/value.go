@@ -14,130 +14,168 @@
 
 package utils
 
-type Value struct {
+type Value interface {
+	Set(i interface{})
+	Get() interface{}
+	GetInt() int
+	GetInt8() int8
+	GetInt16() int16
+	GetInt32() int32
+	GetInt64() int64
+	GetUint() uint
+	GetUint8() uint8
+	GetUint16() uint16
+	GetUint32() uint32
+	GetUint64() uint64
+	GetFloat32() float32
+	GetFloat64() float64
+	GetString() string
+	GetBool() bool
+	GetIntArray() []int
+	GetInt8Array() []int8
+	GetInt16Array() []int16
+	GetInt32Array() []int32
+	GetInt64Array() []int64
+	GetUintArray() []uint
+	GetUint8Array() []uint8
+	GetUint16Array() []uint16
+	GetUint32Array() []uint32
+	GetUint64Array() []uint64
+	GetFloat32Array() []float32
+	GetFloat64Array() []float64
+	GetStringArray() []string
+	GetBoolArray() []bool
+	GetByteArray() []byte
+}
+
+type value struct {
 	inner interface{}
 }
 
-func (v *Value) Set(i interface{}) {
+func NewValue(v interface{}) Value {
+	return &value{v}
+}
+
+func (v *value) Set(i interface{}) {
 	v.inner = i
 }
 
-func (v *Value) Get() interface{} {
+func (v *value) Get() interface{} {
 	return v.inner
 }
 
-func (v *Value) GetInt() int {
+func (v *value) GetInt() int {
 	return v.inner.(int)
 }
 
-func (v *Value) GetInt8() int8 {
+func (v *value) GetInt8() int8 {
 	return v.inner.(int8)
 }
 
-func (v *Value) GetInt16() int16 {
+func (v *value) GetInt16() int16 {
 	return v.inner.(int16)
 }
 
-func (v *Value) GetInt32() int32 {
+func (v *value) GetInt32() int32 {
 	return v.inner.(int32)
 }
 
-func (v *Value) GetInt64() int64 {
+func (v *value) GetInt64() int64 {
 	return v.inner.(int64)
 }
 
-func (v *Value) GetUint() uint {
+func (v *value) GetUint() uint {
 	return v.inner.(uint)
 }
 
-func (v *Value) GetUint8() uint8 {
+func (v *value) GetUint8() uint8 {
 	return v.inner.(uint8)
 }
 
-func (v *Value) GetUint16() uint16 {
+func (v *value) GetUint16() uint16 {
 	return v.inner.(uint16)
 }
 
-func (v *Value) GetUint32() uint32 {
+func (v *value) GetUint32() uint32 {
 	return v.inner.(uint32)
 }
 
-func (v *Value) GetUint64() uint64 {
+func (v *value) GetUint64() uint64 {
 	return v.inner.(uint64)
 }
 
-func (v *Value) GetFloat32() float32 {
+func (v *value) GetFloat32() float32 {
 	return v.inner.(float32)
 }
 
-func (v *Value) GetFloat64() float64 {
+func (v *value) GetFloat64() float64 {
 	return v.inner.(float64)
 }
 
-func (v *Value) GetString() string {
+func (v *value) GetString() string {
 	return v.inner.(string)
 }
 
-func (v *Value) GetBool() bool {
+func (v *value) GetBool() bool {
 	return v.inner.(bool)
 }
 
-func (v *Value) GetIntArray() []int {
+func (v *value) GetIntArray() []int {
 	return v.inner.([]int)
 }
 
-func (v *Value) GetInt8Array() []int8 {
+func (v *value) GetInt8Array() []int8 {
 	return v.inner.([]int8)
 }
 
-func (v *Value) GetInt16Array() []int16 {
+func (v *value) GetInt16Array() []int16 {
 	return v.inner.([]int16)
 }
 
-func (v *Value) GetInt32Array() []int32 {
+func (v *value) GetInt32Array() []int32 {
 	return v.inner.([]int32)
 }
 
-func (v *Value) GetInt64Array() []int64 {
+func (v *value) GetInt64Array() []int64 {
 	return v.inner.([]int64)
 }
 
-func (v *Value) GetUintArray() []uint {
+func (v *value) GetUintArray() []uint {
 	return v.inner.([]uint)
 }
 
-func (v *Value) GetUint8Array() []uint8 {
+func (v *value) GetUint8Array() []uint8 {
 	return v.inner.([]uint8)
 }
 
-func (v *Value) GetUint16Array() []uint16 {
+func (v *value) GetUint16Array() []uint16 {
 	return v.inner.([]uint16)
 }
 
-func (v *Value) GetUint32Array() []uint32 {
+func (v *value) GetUint32Array() []uint32 {
 	return v.inner.([]uint32)
 }
 
-func (v *Value) GetUint64Array() []uint64 {
+func (v *value) GetUint64Array() []uint64 {
 	return v.inner.([]uint64)
 }
 
-func (v *Value) GetFloat32Array() []float32 {
+func (v *value) GetFloat32Array() []float32 {
 	return v.inner.([]float32)
 }
 
-func (v *Value) GetFloat64Array() []float64 {
+func (v *value) GetFloat64Array() []float64 {
 	return v.inner.([]float64)
 }
 
-func (v *Value) GetStringArray() []string {
+func (v *value) GetStringArray() []string {
 	return v.inner.([]string)
 }
 
-func (v *Value) GetBoolArray() []bool {
+func (v *value) GetBoolArray() []bool {
 	return v.inner.([]bool)
 }
 
-func (v *Value) GetByteArray() []byte {
+func (v *value) GetByteArray() []byte {
 	return v.inner.([]byte)
 }

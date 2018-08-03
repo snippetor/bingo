@@ -15,8 +15,6 @@
 package app
 
 import (
-	"github.com/snippetor/bingo/net"
-	"github.com/valyala/fasthttp"
 	"github.com/snippetor/bingo/utils"
 	"github.com/snippetor/bingo/module"
 	"reflect"
@@ -25,68 +23,64 @@ import (
 type Application interface {
 	Name() string
 	AddModule(module.Module)
-	RPCModule() module.RPCModule
-	ServiceModule() module.ServiceModule
-	LogModule() module.LogModule
+	GetModule(module.Module) module.Module
+	RPC() module.RPCModule
+	Service() module.ServiceModule
+	Log() module.LogModule
 	Config() utils.ValueMap
 
 	destroy()
 }
 
-var _ Application = (*app)(nil)
+var _ Application = (*application)(nil)
 
 // model
-type app struct {
+type application struct {
 	name    string
 	config  utils.ValueMap
 	modules map[string]module.Module
 }
 
 func New(name string, config utils.ValueMap) Application {
-	a := &app{name, config, make(map[string]module.Module)}
+	a := &application{name, config, make(map[string]module.Module)}
 	return a
 }
 
-func (a *app) Name() string {
+func (a *application) Name() string {
 	return a.name
 }
 
-func (a *app) AddModule(module module.Module) {
+func (a *application) AddModule(module module.Module) {
 	a.modules[reflect.TypeOf(module).String()] = module
 }
 
-func (a *app) RPCModule() module.RPCModule {
+func (a *application) GetModule(module module.Module) module.Module {
+	if m, ok := a.modules[reflect.TypeOf(module).String()]; ok {
+		return m
+	}
+	return nil
+}
+
+func (a *application) RPC() module.RPCModule {
 	return a.modules["*module.RPCModule"].(module.RPCModule)
 }
 
-func (a *app) ServiceModule() module.ServiceModule {
+func (a *application) Service() module.ServiceModule {
 	return a.modules["*module.ServiceModule"].(module.ServiceModule)
 }
 
-func (a *app) LogModule() module.LogModule {
+func (a *application) Log() module.LogModule {
 	return a.modules["*module.LogModule"].(module.LogModule)
 }
 
-func (a *app) Config() utils.ValueMap {
+func (a *application) Config() utils.ValueMap {
 	return a.config
 }
 
-func (a *app) destroy() {
+func (a *application) destroy() {
 	for _, m := range a.modules {
 		if m != nil {
 			m.Close()
 		}
 	}
-}
-
-func (a *app) OnServiceClientConnected(serviceName string, conn net.IConn) {
-}
-
-func (a *app) OnServiceClientDisconnected(serviceName string, conn net.IConn) {
-}
-
-func (a *app) OnReceiveServiceMessage(conn net.IConn, msgId net.MessageId, msgBody net.MessageBody) {
-}
-
-func (a *app) OnReceiveHttpServiceRequest(ctx *fasthttp.RequestCtx) {
 }

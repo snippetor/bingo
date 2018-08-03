@@ -25,6 +25,7 @@ import (
 	"github.com/snippetor/bingo/log/fwlogger"
 	"github.com/snippetor/bingo/utils"
 	"github.com/snippetor/bingo/log"
+	"github.com/snippetor/bingo/module"
 )
 
 type Service struct {
@@ -54,10 +55,10 @@ type LogConfig struct {
 
 type App struct {
 	Name       string
-	ModelName  string                 `json:"app"`
+	ModelName  string                 `json:"application"`
 	Domain     int
 	Services   []*Service             `json:"service"`
-	Rpc        []*RPC                 `json:"rpc"`
+	Rpc        *RPC                   `json:"rpc"`
 	Config     map[string]interface{} `json:"config"`
 	LogConfigs []*LogConfig           `json:"log"`
 }
@@ -68,8 +69,8 @@ type Config struct {
 }
 
 var (
-	config *Config
-	apps   = make(map[string]Application)
+	config     *Config
+	runningApp = make(map[string]Application)
 )
 
 func init() {
@@ -99,16 +100,7 @@ func findApp(name string) *App {
 	return nil
 }
 
-func runApp(n *App) {
-	// create app
-	m, ok := getappModel(n.ModelName)
-	if !ok {
-		fwlogger.E("-- not found model by name %s --", n.ModelName)
-		return
-	}
-	m.setappName(n.Name)
-	m.initModules()
-
+func runApp(a *App) {
 	// log
 	/**
 	"level": 0,
@@ -121,9 +113,9 @@ func runApp(n *App) {
           "fileMaxSize": "1KB",
           "fileScanInterval": 3
 	 */
-	if n.LogConfigs != nil {
-		loggers := make(map[string]*log.Logger)
-		for _, c := range n.LogConfigs {
+	loggers := module.Loggers{}
+	if a.LogConfigs != nil {
+		for _, c := range a.LogConfigs {
 			config := log.DEFAULT_CONFIG
 			if c.Level != 0 {
 				config.Level = log.Level(c.Level)
@@ -169,35 +161,30 @@ func runApp(n *App) {
 			}
 			loggers[c.Name] = log.NewLoggerWithConfig(config)
 		}
-		m.setLoggers(loggers)
 	}
-
 	// config
-	vm := &utils.ValueMap{}
-	for k, v := range n.Config {
-		vm.Put(k, v)
+	appConfig := utils.NewValueMap()
+	for k, v := range a.Config {
+		appConfig.Put(k, v)
 	}
-	m.setConfig(vm)
-
-	// init
-	m.OnInit()
-
 	// rpc
-	if n.RpcPort > 0 {
-		s := &rpc.Server{}
-		s.Listen(n.Name, n.ModelName, n.RpcPort)
-		m.setRPCServer(s)
+	var rpcServer *rpc.Server
+	if a.Rpc.Port > 0 {
+		rpcServer = &rpc.Server{}
+		rpcServer.Listen(a.Name, a.ModelName, a.Rpc.Port)
 	}
-	for _, rpcServerapp := range n.RpcTo {
+	var rpcClients []*rpc.Client
+	for _, serverName := range a.Rpc.To {
 		c := &rpc.Client{}
-		serverapp := findApp(rpcServerapp)
-		if serverapp != nil {
-			c.Connect(n.Name, n.ModelName, config.Domains[serverapp.Domain]+":"+strconv.Itoa(serverapp.RpcPort))
-			m.putRPCClient(serverapp.Name, c)
+		serverApp := findApp(serverName)
+		if serverApp != nil {
+			c.Connect(a.Name, a.ModelName, config.Domains[serverApp.Domain]+":"+strconv.Itoa(serverApp.Rpc.Port))
+			rpcClients = append(rpcClients, c)
 		}
 	}
 	// service
-	for _, s := range n.Services {
+	services := module.Services{}
+	for _, s := range a.Services {
 		switch strings.ToLower(s.Type) {
 		case "tcp":
 			serv := net.GoListen(net.Tcp, s.Port, func(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
@@ -210,7 +197,7 @@ func runApp(n *App) {
 					m.OnReceiveServiceMessage(conn, msgId, body)
 				}
 			})
-			m.putService(s.Name, serv)
+			services[s.Name] = serv
 		case "ws":
 			serv := net.GoListen(net.WebSocket, s.Port, func(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
 				switch msgId {
@@ -222,7 +209,7 @@ func runApp(n *App) {
 					m.OnReceiveServiceMessage(conn, msgId, body)
 				}
 			})
-			m.putService(s.Name, serv)
+			services[s.Name] = serv
 		case "http":
 			go func() {
 				fwlogger.D("-- http service start on %s --", strconv.Itoa(s.Port))
@@ -236,13 +223,17 @@ func runApp(n *App) {
 		}
 	}
 
-	apps[n.Name] = &m
+	app := New(a.Name, appConfig)
+	app.AddModule(module.NewLogModule(loggers))
+	app.AddModule(module.NewRPCModule(a.Name, rpcClients, rpcServer))
+	app.AddModule(module.NewServiceModule(services))
+	runningApp[a.Name] = app
 }
 
 func Run(appName string) {
 	n := findApp(appName)
 	if n == nil {
-		fwlogger.E("-- run app failed! not found app by name %s --", appName)
+		fwlogger.E("-- run application failed! not found application by name %s --", appName)
 		return
 	}
 	runApp(n)
@@ -251,10 +242,10 @@ func Run(appName string) {
 func Stop(appName string) {
 	n := findApp(appName)
 	if n == nil {
-		fwlogger.E("-- stop app failed! not found app by name %s --", appName)
+		fwlogger.E("-- stop application failed! not found application by name %s --", appName)
 		return
 	}
-	if m, ok := apps[appName]; ok {
+	if m, ok := runningApp[appName]; ok {
 		m.destroy()
 	}
 }
@@ -266,7 +257,7 @@ func RunAll() {
 }
 
 func StopAll() {
-	for _, m := range apps {
+	for _, m := range runningApp {
 		if m != nil {
 			m.destroy()
 		}

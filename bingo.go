@@ -63,7 +63,7 @@ func Version() string {
 	return "v1.0"
 }
 
-func BindNodeModel(modelName string, model interface{}) {
+func BindAppModel(modelName string, model interface{}) {
 	app.BindNodeModel(modelName, model.(app.IModel))
 }
 

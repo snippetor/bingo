@@ -33,14 +33,14 @@ message RPCHandShake {
 }
 
 message RPCMethodCall {
-    required int32 call_seq = 1;
+    required uint32 call_seq = 1;
     required string method = 2;
     map<string, RPCValue> args = 3;
     required string caller = 4; // 谁调用的
 }
 
 message RPCMethodReturn {
-    required int32 call_seq = 1;
+    required uint32 call_seq = 1;
     required string method = 2;
     map<string, RPCValue> returns = 3;
 }

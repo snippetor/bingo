@@ -16,7 +16,6 @@ package rpc
 
 import (
 	"time"
-	"github.com/snippetor/bingo/utils"
 	"github.com/snippetor/bingo/net"
 	"github.com/snippetor/bingo/log/fwlogger"
 	"sync"
@@ -25,7 +24,7 @@ import (
 type RPCCallback func(*Args)
 
 type callTask struct {
-	seq        utils.Identity
+	seq        uint32
 	method     string
 	conn       net.IConn
 	msg        net.MessageBody
@@ -75,7 +74,7 @@ func (w *callSyncWorker) waitingResult(t *callTask) {
 	}
 }
 
-func (w *callSyncWorker) receiveResult(callSeq utils.Identity, result *Args) {
+func (w *callSyncWorker) receiveResult(callSeq uint32, result *Args) {
 	if w.callTasks == nil {
 		fwlogger.E("-- RPC callSyncWorker.callTask not init --")
 		return

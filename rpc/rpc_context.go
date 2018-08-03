@@ -169,7 +169,7 @@ func (a *Args) FromRPCMap(m *map[string]*RPCValue) {
 }
 
 type Context struct {
-	callSeq        int32
+	callSeq        uint32
 	RemoteNodeName string
 	conn           net.IConn
 	Method         string
@@ -192,6 +192,6 @@ func (c *Context) ReturnNil() {
 	}
 }
 
-func (c *Context) GetConnectionIdentify() utils.Identity {
+func (c *Context) GetConnectionIdentify() uint32 {
 	return c.conn.Identity()
 }

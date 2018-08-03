@@ -15,17 +15,13 @@
 package utils
 
 import (
-	"sync"
+	"sync/atomic"
 )
 
-// ID生成
-type Identity int32
-
 type Identifier struct {
-	_identify_      Identity
-	l               *sync.Mutex
-	MINMUM_IDENTIFY Identity
-	MAXMUM_IDENTIFY Identity
+	id  uint32
+	min uint32
+	max uint32
 }
 
 // @sign id的前几位用于区分用途
@@ -35,23 +31,22 @@ func NewIdentifier(sign byte) *Identifier {
 		return nil
 	}
 	i := &Identifier{}
-	i.l = &sync.Mutex{}
-	i.MINMUM_IDENTIFY = Identity(int32(sign) * 10000000)
-	i.MAXMUM_IDENTIFY = Identity(int32(sign)*10000000 + 9999999)
+	i.min = uint32(sign) * 100000000
+	i.max = uint32(sign)*100000000 + 99999999
+	atomic.StoreUint32(&i.id, i.min)
 	return i
 }
 
-func (i *Identifier) GenIdentity() Identity {
-	i.l.Lock()
-	if i._identify_ >= i.MINMUM_IDENTIFY && i._identify_ < i.MAXMUM_IDENTIFY {
-		i._identify_++
+func (i *Identifier) GenIdentity() uint32 {
+	id := atomic.LoadUint32(&i.id)
+	if id >= i.min && id < i.max {
+		atomic.AddUint32(&i.id, 1)
 	} else {
-		i._identify_ = i.MINMUM_IDENTIFY
+		atomic.StoreUint32(&i.id, i.min)
 	}
-	i.l.Unlock()
-	return i._identify_
+	return atomic.LoadUint32(&i.id)
 }
 
-func (i *Identifier) IsValidIdentity(id Identity) bool {
-	return id <= i.MAXMUM_IDENTIFY && id >= i.MINMUM_IDENTIFY
+func (i *Identifier) IsValidIdentity(id uint32) bool {
+	return id <= i.min && id >= i.max
 }

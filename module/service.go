@@ -8,11 +8,13 @@ type ServiceModule interface {
 	GetService(name string) (net.IServer, bool)
 }
 
+type Services map[string]net.IServer
+
 type serviceModule struct {
-	servers map[string]net.IServer
+	servers Services
 }
 
-func NewServiceModule(servers map[string]net.IServer) ServiceModule {
+func NewServiceModule(servers Services) ServiceModule {
 	return &serviceModule{servers}
 }
 

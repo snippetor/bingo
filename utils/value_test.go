@@ -6,12 +6,11 @@ import (
 )
 
 func TestValue_Set(t *testing.T) {
-	v := Value{}
-	v.Set("test")
+	v := NewValue("test")
 	fmt.Println(v.GetString())
 
 
-	vm := &ValueMap{}
+	vm := NewValueMap()
 	vm.Put("test", "test")
 	fmt.Println(vm.Get("test").GetString())
 }

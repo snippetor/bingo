@@ -8,11 +8,11 @@ import (
 func TestGenIdentity(t *testing.T) {
 	i := NewIdentifier(8)
 
-	for k := 0; k < 100000; k++ {
-		fmt.Println(i.GenIdentity())
-	}
+	//for k := 0; k < 100000; k++ {
+	//	fmt.Println(i.GenIdentity())
+	//}
 
-	for k := 0; k < 100000; k++ {
+	for k := 0; k < 10000; k++ {
 		go func() {
 			fmt.Println(i.GenIdentity())
 		}()

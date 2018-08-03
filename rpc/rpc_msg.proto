@@ -9,14 +9,14 @@ enum RPC_MSGID {
 message RPCValue {
     required int32 kind = 1;
 
-    required int32 i32 = 2;
-    required int64 i64 = 3;
-    required uint32 u32 = 4;
-    required uint64 u64 = 5;
-    required float f32 = 6;
-    required double f64 = 7;
-    required bool b = 8;
-    required string s = 9;
+    optional int32 i32 = 2;
+    optional int64 i64 = 3;
+    optional uint32 u32 = 4;
+    optional uint64 u64 = 5;
+    optional float f32 = 6;
+    optional double f64 = 7;
+    optional bool b = 8;
+    optional string s = 9;
     repeated int32 i32a = 10;
     repeated int64 i64a = 11;
     repeated uint32 u32a = 12;

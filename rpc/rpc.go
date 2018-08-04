@@ -24,14 +24,14 @@ import (
 )
 
 var (
-	defaultCodec codec.ICodec
+	DefaultCodec codec.ICodec
 )
 
 func init() {
-	defaultCodec = codec.NewCodec(codec.Protobuf)
+	DefaultCodec = codec.NewCodec(codec.Protobuf)
 }
 
-type OnCallFunc func(net.IConn, uint32, string, Args)
+type LocalCallFunc func(net.IConn, string, uint32, string, *Args)
 
 type EndStub interface {
 	Call(method string, args *Args) (*Args, bool)
@@ -46,13 +46,13 @@ type Server struct {
 	l          *sync.RWMutex
 	identifier *utils.Identifier
 	callSyncWorker
-	OnCallFunc
+	LocalCallFunc
 }
 
-func (s *Server) Listen(name, modelName string, port int, callFunc OnCallFunc) {
+func (s *Server) Listen(name, modelName string, port int, callFunc LocalCallFunc) {
 	s.name = name
 	s.modelName = modelName
-	s.OnCallFunc = callFunc
+	s.LocalCallFunc = callFunc
 	s.l = &sync.RWMutex{}
 	s.identifier = utils.NewIdentifier(2)
 	if s.serv = net.GoListen(net.Tcp, port, s.handleMessage); s.serv == nil {
@@ -77,12 +77,12 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 		}
 	case RPC_MSGID_HANDSHAKE:
 		// ack handshake to RPC server
-		body := defaultCodec.Marshal(&RPCHandShake{EndName: s.name, EndModelName: s.modelName})
+		body := DefaultCodec.Marshal(&RPCHandShake{EndName: s.name, EndModelName: s.modelName})
 		if !conn.Send(net.MessageId(RPC_MSGID_HANDSHAKE), body) {
 			fwlogger.E("-- send handshake %s failed! send message failed --", s.name)
 		}
 		handshake := &RPCHandShake{}
-		defaultCodec.Unmarshal(body, handshake)
+		DefaultCodec.Unmarshal(body, handshake)
 		c := &Client{}
 		c.conn = conn
 		c.EndName = handshake.EndName
@@ -96,14 +96,14 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 		s.l.Unlock()
 	case RPC_MSGID_CALL:
 		call := &RPCMethodCall{}
-		defaultCodec.Unmarshal(body, call)
-		fwlogger.D("@call noreturn method %s(%d) with args %s", call.Method, call.CallSeq, call.Args)
-		args := Args{}
+		DefaultCodec.Unmarshal(body, call)
+		fwlogger.D("@[%s] call noreturn method %s(%d) with args %s", call.Caller, call.Method, call.CallSeq, call.Args)
+		args := &Args{}
 		args.FromRPCMap(&call.Args)
-		s.OnCallFunc(conn, call.CallSeq, call.Method, args)
+		s.LocalCallFunc(conn, call.Caller, call.CallSeq, call.Method, args)
 	case RPC_MSGID_RETURN:
 		ret := &RPCMethodReturn{}
-		defaultCodec.Unmarshal(body, ret)
+		DefaultCodec.Unmarshal(body, ret)
 		fwlogger.D("@receive return from RPC method %s(%d) with result %s", ret.Method, ret.CallSeq, ret.Returns)
 		args := Args{}
 		args.FromRPCMap(&ret.Returns)
@@ -137,13 +137,13 @@ type Client struct {
 	callSyncWorker
 	forceClose   bool
 	tcpClient    net.IClient
-	OnCallFunc
+	LocalCallFunc
 }
 
-func (c *Client) Connect(name, modelName, serverAddress string, callFunc OnCallFunc) {
+func (c *Client) Connect(name, modelName, serverAddress string, callFunc LocalCallFunc) {
 	c.name = name
 	c.modelName = modelName
-	c.OnCallFunc = callFunc
+	c.LocalCallFunc = callFunc
 	c.state = net.STATE_CONNECTING
 	c.addr = serverAddress
 	c.identifier = utils.NewIdentifier(3)
@@ -171,7 +171,7 @@ func (c *Client) Call(method string, args *Args) (*Args, bool) {
 	seq := c.identifier.GenIdentity()
 	res := make(map[string]*RPCValue)
 	args.ToRPCMap(&res)
-	body := defaultCodec.Marshal(&RPCMethodCall{CallSeq: seq, Method: method, Args: res})
+	body := DefaultCodec.Marshal(&RPCMethodCall{CallSeq: seq, Method: method, Args: res, Caller: c.name})
 	if !c.conn.Send(net.MessageId(RPC_MSGID_CALL), body) {
 		fwlogger.E("-- call rpc method %s failed! send message failed --", method)
 	} else {
@@ -194,7 +194,7 @@ func (c *Client) CallNoReturn(method string, args *Args) bool {
 	defer c.l.RUnlock()
 	res := make(map[string]*RPCValue)
 	args.ToRPCMap(&res)
-	body := defaultCodec.Marshal(&RPCMethodCall{CallSeq: c.identifier.GenIdentity(), Method: method, Args: res})
+	body := DefaultCodec.Marshal(&RPCMethodCall{CallSeq: c.identifier.GenIdentity(), Method: method, Args: res, Caller: c.name})
 	if !c.conn.Send(net.MessageId(RPC_MSGID_CALL), body) {
 		fwlogger.E("-- call rpc method %s failed! send message failed --", method)
 	} else {
@@ -208,7 +208,7 @@ func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 	case RPC_MSGID(net.MSGID_CONNECT_CONNECTED):
 		fwlogger.D("-- %s connect RPC server success  --", c.EndName)
 		// send handshake to RPC server
-		body := defaultCodec.Marshal(&RPCHandShake{EndName: c.name, EndModelName: c.modelName})
+		body := DefaultCodec.Marshal(&RPCHandShake{EndName: c.name, EndModelName: c.modelName})
 		if !conn.Send(net.MessageId(RPC_MSGID_HANDSHAKE), body) {
 			fwlogger.E("-- send handshake %s failed! send message failed --", c.EndName)
 		}
@@ -220,19 +220,19 @@ func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 		}
 	case RPC_MSGID_HANDSHAKE:
 		handshake := &RPCHandShake{}
-		defaultCodec.Unmarshal(body, handshake)
+		DefaultCodec.Unmarshal(body, handshake)
 		c.EndName = handshake.EndName
 		c.EndModelName = handshake.EndModelName
 	case RPC_MSGID_CALL:
 		call := &RPCMethodCall{}
-		defaultCodec.Unmarshal(body, call)
-		fwlogger.D("@call method %s(%d) with args %s", call.Method, call.CallSeq, call.Args)
-		args := Args{}
+		DefaultCodec.Unmarshal(body, call)
+		fwlogger.D("@[%s] call method %s(%d) with args %s", call.Caller, call.Method, call.CallSeq, call.Args)
+		args := &Args{}
 		args.FromRPCMap(&call.Args)
-		c.OnCallFunc(conn, call.CallSeq, call.Method, args)
+		c.LocalCallFunc(conn, call.Caller, call.CallSeq, call.Method, args)
 	case RPC_MSGID_RETURN:
 		ret := &RPCMethodReturn{}
-		defaultCodec.Unmarshal(body, ret)
+		DefaultCodec.Unmarshal(body, ret)
 		fwlogger.D("@receive return from RPC method %s(%d) with result %s", ret.Method, ret.CallSeq, ret.Returns)
 		args := Args{}
 		args.FromRPCMap(&ret.Returns)

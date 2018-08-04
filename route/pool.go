@@ -13,7 +13,7 @@ type Pool struct {
 }
 
 // New creates and returns a new context pool.
-func New(newFunc func() Context) *Pool {
+func NewPool(newFunc func() Context) *Pool {
 	c := &Pool{pool: &sync.Pool{}, newFunc: newFunc}
 	c.pool.New = func() interface{} { return c.newFunc() }
 	return c

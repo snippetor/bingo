@@ -3,6 +3,7 @@ package route
 import (
 	"sync/atomic"
 	"github.com/snippetor/bingo/app"
+	"fmt"
 )
 
 type Context interface {
@@ -25,7 +26,7 @@ type Context interface {
 	// and any other optional steps, depends on dev's application type.
 	EndRequest()
 	// returns the unique id
-	Id() uint64
+	Id() uint32
 	// Do calls the SetHandlers(handlers)
 	// and executes the first handler,
 	// handlers should not be empty.
@@ -124,6 +125,12 @@ type Context interface {
 	// IsStopped checks and returns true if the current position of the Context is 255,
 	// means that the StopExecution() was called.
 	IsStopped() bool
+
+	App() app.Application
+
+	LogE(format string, v ...interface{})
+	LogD(format string, v ...interface{})
+	LogBi(format string, v ...interface{})
 }
 
 var _ Context = (*context)(nil)
@@ -145,7 +152,7 @@ type context struct {
 	// the unique id, it's zero until `String` function is called,
 	// it's here to cache the random, unique context's id, although `String`
 	// returns more than this.
-	id uint64
+	id uint32
 	// the current route's name registered to this request path.
 	currentRouteName string
 
@@ -177,12 +184,12 @@ func (ctx *context) BeginRequest() {
 func (ctx *context) EndRequest() {
 }
 
-var lastCapturedContextID uint64
+var lastCapturedContextID uint32
 
-func (ctx *context) Id() uint64 {
+func (ctx *context) Id() uint32 {
 	if ctx.id == 0 {
 		// set the id here.
-		forward := atomic.AddUint64(&lastCapturedContextID, 1)
+		forward := atomic.AddUint32(&lastCapturedContextID, 1)
 		ctx.id = forward
 	}
 	return ctx.id
@@ -404,4 +411,27 @@ func (ctx *context) StopExecution() {
 // means that the StopExecution() was called.
 func (ctx *context) IsStopped() bool {
 	return ctx.currentHandlerIndex == stopExecutionIndex
+}
+
+func (ctx *context) App() app.Application {
+	return ctx.app
+}
+
+///////////////// log ///////////////////////
+func (ctx *context) LogE(format string, v ...interface{}) {
+	if logger := ctx.app.Log().GetLogger("error"); logger != nil {
+		logger.E(fmt.Sprintf("[%010v] ", ctx.Id())+format, v...)
+	}
+}
+
+func (ctx *context) LogD(format string, v ...interface{}) {
+	if logger := ctx.app.Log().GetLogger("debug"); logger != nil {
+		logger.D(fmt.Sprintf("[%010v] ", ctx.Id())+format, v...)
+	}
+}
+
+func (ctx *context) LogBi(format string, v ...interface{}) {
+	if logger := ctx.app.Log().GetLogger("bi"); logger != nil {
+		logger.D(fmt.Sprintf("[%010v] ", ctx.Id())+format, v...)
+	}
 }

@@ -2,7 +2,7 @@ package route
 
 import (
 	"fmt"
-	"github.com/valyala/fasthttp"
+	"github.com/snippetor/bingo/net"
 )
 
 type Router interface {
@@ -61,10 +61,10 @@ func (r *router) HandleServiceMessage(msgId interface{}, handlers ...Handler) {
 	}
 }
 
-func (r *router) OnWebApiRequest(ctx *fasthttp.RequestCtx) {
-	mixed := r.mix("API", string(ctx.Path()))
+func (r *router) OnWebApiRequest(path string, ctx Context) {
+	mixed := r.mix("API", path)
 	if hs, ok := r.routes[mixed]; ok {
-		//ctx.Do(hs)
+		ctx.Do(hs)
 	}
 }
 
@@ -75,7 +75,7 @@ func (r *router) OnRPCRequest(method string, ctx Context) {
 	}
 }
 
-func (r *router) OnServiceRequest(msgId interface{}, ctx Context) {
+func (r *router) OnServiceRequest(msgId net.MessageId, ctx Context) {
 	mixed := r.mix("MSG", msgId)
 	if hs, ok := r.routes[mixed]; ok {
 		ctx.Do(hs)

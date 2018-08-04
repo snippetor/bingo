@@ -19,11 +19,9 @@ import (
 	"flag"
 	"runtime"
 	"os"
-	"github.com/snippetor/bingo/node"
 	"path/filepath"
 	"github.com/snippetor/bingo/log"
 	"github.com/snippetor/bingo/log/fwlogger"
-	"github.com/snippetor/bingo/app"
 )
 
 var (
@@ -63,10 +61,6 @@ func Version() string {
 	return "v1.0"
 }
 
-func BindAppModel(modelName string, model interface{}) {
-	app.BindNodeModel(modelName, model.(app.IModel))
-}
-
 func SetLogLevel(level log.Level) {
 	fwlogger.SetLevel(level)
 }
@@ -103,10 +97,10 @@ func Run() {
 	}
 
 	if filepath.IsAbs(c) {
-		app.Parse(c)
+		parse(c)
 	} else {
 		if dir, err := os.Getwd(); err == nil {
-			app.Parse(filepath.Join(dir, c))
+			parse(filepath.Join(dir, c))
 		}
 	}
 
@@ -114,15 +108,15 @@ func Run() {
 
 	} else {
 		if n == "" {
-			app.RunAll()
+			runAll()
 		} else {
-			app.Run(n)
+			runApp(n)
 		}
 	}
 
 	select {
 	case <-endRunning:
-		app.StopAll()
+		stopAll()
 	}
 	//<-endRunning
 }

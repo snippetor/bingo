@@ -22,6 +22,21 @@ import (
 	"github.com/snippetor/bingo/utils"
 )
 
+/**
+消息ID组成：
+123456
+1 表示消息类别REQ、ACK、NTF、CMD
+2 表示消息组，例如gate, hall, game
+34 在game消息组中表示游戏ID，其他消息组暂时为0
+56 表示具体消息
+ */
+const (
+	MsgTypeReq int32 = 1
+	MsgTypeAck int32 = 2
+	MsgTypeNtf int32 = 3
+	MsgTypeCmd int32 = 4
+)
+
 type MessageId int32
 type MessageBody []byte
 
@@ -53,6 +68,26 @@ func (i MessageId) Int() int {
 	return int(i)
 }
 
+func (i MessageId) Type() int32 {
+	return i.Int32() / 100000
+}
+
+func (i MessageId) Group() int32 {
+	return (i.Int32() % 100000) / 10000
+}
+
+func (i MessageId) Extra() int32 {
+	return (i.Int32() % 10000) / 100
+}
+
+func (i MessageId) MsgId() int32 {
+	return i.Int32() % 100
+}
+
+func PackId(idType, group, extra, id int32) MessageId {
+	return MessageId(idType*100000 + group*10000 + extra*100 + id)
+}
+
 const (
 	MSGID_CONNECT_DISCONNECT = -1
 	MSGID_CONNECT_CONNECTED  = -2
@@ -76,7 +111,7 @@ type IConn interface {
 	Address() string
 	read(*[]byte) (int, error)
 	GetNetProtocol() NetProtocol
-	Identity() utils.Identity
+	Identity() uint32
 	GetState() ConnState
 	setState(ConnState)
 }
@@ -84,7 +119,7 @@ type IConn interface {
 // 服务器接口
 type IServer interface {
 	listen(int, IMessageCallback) bool
-	GetConnection(utils.Identity) (IConn, bool)
+	GetConnection(uint32) (IConn, bool)
 	Close()
 }
 
@@ -113,7 +148,7 @@ func init() {
 }
 
 type absConn struct {
-	identity utils.Identity
+	identity uint32
 	state    ConnState
 }
 
@@ -131,7 +166,7 @@ func (c *absConn) read(*[]byte) (int, error) {
 func (c *absConn) GetNetProtocol() NetProtocol {
 	return -1
 }
-func (c *absConn) Identity() utils.Identity {
+func (c *absConn) Identity() uint32 {
 	if !identifier.IsValidIdentity(c.identity) {
 		c.identity = identifier.GenIdentity()
 	}

@@ -13,13 +13,6 @@ func Check(err error) bool {
 	return true
 }
 
-func LogError(logger *log.Logger) {
-	if err := recover(); err != nil {
-		logger.E("# Catch error: %s", err.(error).Error())
-		logger.E("# Debug Stack: %s", debug.Stack())
-	}
-}
-
 func CatchError(callback func(error)) bool {
 	if err := recover(); err != nil {
 		callback(err.(error))

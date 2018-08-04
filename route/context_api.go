@@ -4,6 +4,7 @@ import (
 	"github.com/valyala/fasthttp"
 	"github.com/bitly/go-simplejson"
 	"github.com/snippetor/bingo/errors"
+	"encoding/json"
 )
 
 type WebApiContext struct {
@@ -31,12 +32,9 @@ func (c *WebApiContext) RequestBody() *simplejson.Json {
 	return j
 }
 
-func (c *WebApiContext) ResponseOK(json interface{}) {
+func (c *WebApiContext) ResponseOK(body interface{}) {
 	c.RequestCtx.Response.SetStatusCode(fasthttp.StatusOK)
-	j := simplejson.New()
-	j.Set("status", 0)
-	j.Set("params", json)
-	if bs, err := j.Encode(); err == nil {
+	if bs, err := json.Marshal(body); err == nil {
 		c.RequestCtx.Response.SetBody(bs)
 		c.LogD("<==== %s %s", string(c.RequestCtx.Path()), string(bs))
 	} else {
@@ -47,8 +45,7 @@ func (c *WebApiContext) ResponseOK(json interface{}) {
 func (c *WebApiContext) ResponseFailed(reason string) {
 	c.RequestCtx.Response.SetStatusCode(fasthttp.StatusOK)
 	j := simplejson.New()
-	j.Set("status", -1)
-	j.Set("desc", reason)
+	j.Set("error", reason)
 	if bs, err := j.Encode(); err == nil {
 		c.RequestCtx.Response.SetBody(bs)
 		c.LogD("<==== %s %s", string(c.RequestCtx.Path()), string(bs))

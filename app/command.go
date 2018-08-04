@@ -53,7 +53,7 @@ type LogConfig struct {
 	FileScanInterval    int
 }
 
-type App struct {
+type AppConfig struct {
 	Name       string
 	ModelName  string                 `json:"application"`
 	Domain     int
@@ -64,8 +64,8 @@ type App struct {
 }
 
 type Config struct {
-	Domains []string `json:"domains"`
-	Apps    []*App   `json:"apps"`
+	Domains []string     `json:"domains"`
+	Apps    []*AppConfig `json:"apps"`
 }
 
 var (
@@ -91,7 +91,7 @@ func Parse(configPath string) {
 	//TODO check
 }
 
-func findApp(name string) *App {
+func findApp(name string) *AppConfig {
 	for _, n := range config.Apps {
 		if n.Name == name {
 			return n
@@ -100,7 +100,15 @@ func findApp(name string) *App {
 	return nil
 }
 
-func runApp(a *App) {
+func runApp(a *AppConfig) {
+	// config
+	appConfig := utils.NewValueMap()
+	for k, v := range a.Config {
+		appConfig.Put(k, v)
+	}
+	// new application
+	app := New(a.Name, appConfig)
+	var router = app.router()
 	// log
 	/**
 	"level": 0,
@@ -162,26 +170,27 @@ func runApp(a *App) {
 			loggers[c.Name] = log.NewLoggerWithConfig(config)
 		}
 	}
-	// config
-	appConfig := utils.NewValueMap()
-	for k, v := range a.Config {
-		appConfig.Put(k, v)
-	}
+	app.AddModule(module.NewLogModule(loggers))
 	// rpc
 	var rpcServer *rpc.Server
 	if a.Rpc.Port > 0 {
 		rpcServer = &rpc.Server{}
-		rpcServer.Listen(a.Name, a.ModelName, a.Rpc.Port)
+		rpcServer.Listen(a.Name, a.ModelName, a.Rpc.Port, func(conn net.IConn, u uint32, s string, args rpc.Args) {
+
+		})
 	}
 	var rpcClients []*rpc.Client
 	for _, serverName := range a.Rpc.To {
 		c := &rpc.Client{}
 		serverApp := findApp(serverName)
 		if serverApp != nil {
-			c.Connect(a.Name, a.ModelName, config.Domains[serverApp.Domain]+":"+strconv.Itoa(serverApp.Rpc.Port))
+			c.Connect(a.Name, a.ModelName, config.Domains[serverApp.Domain]+":"+strconv.Itoa(serverApp.Rpc.Port), func(conn net.IConn, u uint32, s string, args rpc.Args) {
+				
+			})
 			rpcClients = append(rpcClients, c)
 		}
 	}
+	app.AddModule(module.NewRPCModule(a.Name, rpcClients, rpcServer))
 	// service
 	services := module.Services{}
 	for _, s := range a.Services {
@@ -215,17 +224,17 @@ func runApp(a *App) {
 				fwlogger.D("-- http service start on %s --", strconv.Itoa(s.Port))
 				if err := fasthttp.ListenAndServe(":"+strconv.Itoa(s.Port), func(ctx *fasthttp.RequestCtx) {
 					fwlogger.D("====> %s %s", string(ctx.Path()), string(ctx.Request.Body()))
-					m.OnReceiveHttpServiceRequest(ctx)
+					if r, ok := router.(interface {
+						OnWebApiRequest(*fasthttp.RequestCtx)
+					}); ok {
+						r.OnWebApiRequest(ctx)
+					}
 				}); err != nil {
 					fwlogger.E("-- startup http service failed! %s --", err.Error())
 				}
 			}()
 		}
 	}
-
-	app := New(a.Name, appConfig)
-	app.AddModule(module.NewLogModule(loggers))
-	app.AddModule(module.NewRPCModule(a.Name, rpcClients, rpcServer))
 	app.AddModule(module.NewServiceModule(services))
 	runningApp[a.Name] = app
 }

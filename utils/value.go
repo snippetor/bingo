@@ -52,8 +52,8 @@ type value struct {
 	inner interface{}
 }
 
-func NewValue(v interface{}) Value {
-	return &value{v}
+func NewValue() Value {
+	return &value{}
 }
 
 func (v *value) Set(i interface{}) {

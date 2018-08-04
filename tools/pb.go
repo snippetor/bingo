@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"fmt"
 	"io/ioutil"
-	"strings"
 	"bytes"
 )
 
@@ -24,9 +23,9 @@ func main() {
 				continue
 			}
 			protoDir := filepath.Dir(protofile)
-			genDir := filepath.Join(protoDir, strings.Split(f.Name(), ".")[0])
-			os.Mkdir(genDir, os.ModePerm)
-			cmd := exec.Command("tools/protoc", "--gogofaster_out="+genDir, "--proto_path="+protoDir, protofile)
+			//genDir := filepath.Join(protoDir, strings.Split(f.Name(), ".")[0])
+			//os.Mkdir(genDir, os.ModePerm)
+			cmd := exec.Command("tools/protoc", "--gogofaster_out="+protoDir, "--proto_path="+protoDir, protofile)
 			var stderr bytes.Buffer
 			cmd.Stderr = &stderr
 			err := cmd.Run()

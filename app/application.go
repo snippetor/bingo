@@ -18,6 +18,7 @@ import (
 	"github.com/snippetor/bingo/utils"
 	"github.com/snippetor/bingo/module"
 	"reflect"
+	"github.com/snippetor/bingo/route"
 )
 
 type Application interface {
@@ -29,6 +30,7 @@ type Application interface {
 	Log() module.LogModule
 	Config() utils.ValueMap
 
+	router() route.Router
 	destroy()
 }
 
@@ -39,10 +41,11 @@ type application struct {
 	name    string
 	config  utils.ValueMap
 	modules map[string]module.Module
+	r       route.Router
 }
 
 func New(name string, config utils.ValueMap) Application {
-	a := &application{name, config, make(map[string]module.Module)}
+	a := &application{name, config, make(map[string]module.Module), route.NewRouter()}
 	return a
 }
 
@@ -75,6 +78,10 @@ func (a *application) Log() module.LogModule {
 
 func (a *application) Config() utils.ValueMap {
 	return a.config
+}
+
+func (a *application) router() route.Router {
+	return a.r
 }
 
 func (a *application) destroy() {

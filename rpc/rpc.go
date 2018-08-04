@@ -31,8 +31,9 @@ func init() {
 	defaultCodec = codec.NewCodec(codec.Protobuf)
 }
 
-type IEndStub interface {
-	SetRouter(router *Router)
+type OnCallFunc func(net.IConn, uint32, string, Args)
+
+type EndStub interface {
 	Call(method string, args *Args) (*Args, bool)
 	CallNoReturn(method string, args *Args) bool
 }
@@ -45,12 +46,13 @@ type Server struct {
 	l          *sync.RWMutex
 	identifier *utils.Identifier
 	callSyncWorker
-	r          *Router
+	OnCallFunc
 }
 
-func (s *Server) Listen(name, modelName string, port int) {
+func (s *Server) Listen(name, modelName string, port int, callFunc OnCallFunc) {
 	s.name = name
 	s.modelName = modelName
+	s.OnCallFunc = callFunc
 	s.l = &sync.RWMutex{}
 	s.identifier = utils.NewIdentifier(2)
 	if s.serv = net.GoListen(net.Tcp, port, s.handleMessage); s.serv == nil {
@@ -98,8 +100,7 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 		fwlogger.D("@call noreturn method %s(%d) with args %s", call.Method, call.CallSeq, call.Args)
 		args := Args{}
 		args.FromRPCMap(&call.Args)
-		ctx := &Context{conn: conn, callSeq: call.CallSeq, Method: call.Method, Args: args}
-		s.r.Invoke(s.name, call.Method, ctx)
+		s.OnCallFunc(conn, call.CallSeq, call.Method, args)
 	case RPC_MSGID_RETURN:
 		ret := &RPCMethodReturn{}
 		defaultCodec.Unmarshal(body, ret)
@@ -123,10 +124,6 @@ func (s *Server) GetClient(name string) (*Client, bool) {
 	return nil, false
 }
 
-func (s *Server) SetRouter(router *Router) {
-	s.r = router
-}
-
 type Client struct {
 	name         string
 	modelName    string
@@ -139,13 +136,14 @@ type Client struct {
 	identifier   *utils.Identifier
 	callSyncWorker
 	forceClose   bool
-	r            *Router
 	tcpClient    net.IClient
+	OnCallFunc
 }
 
-func (c *Client) Connect(name, modelName, serverAddress string) {
+func (c *Client) Connect(name, modelName, serverAddress string, callFunc OnCallFunc) {
 	c.name = name
 	c.modelName = modelName
+	c.OnCallFunc = callFunc
 	c.state = net.STATE_CONNECTING
 	c.addr = serverAddress
 	c.identifier = utils.NewIdentifier(3)
@@ -173,7 +171,7 @@ func (c *Client) Call(method string, args *Args) (*Args, bool) {
 	seq := c.identifier.GenIdentity()
 	res := make(map[string]*RPCValue)
 	args.ToRPCMap(&res)
-	body := defaultCodec.Marshal(&RPCMethodCall{CallSeq: int32(seq), Method: method, Args: res})
+	body := defaultCodec.Marshal(&RPCMethodCall{CallSeq: seq, Method: method, Args: res})
 	if !c.conn.Send(net.MessageId(RPC_MSGID_CALL), body) {
 		fwlogger.E("-- call rpc method %s failed! send message failed --", method)
 	} else {
@@ -205,10 +203,6 @@ func (c *Client) CallNoReturn(method string, args *Args) bool {
 	return false
 }
 
-func (c *Client) SetRouter(router *Router) {
-	c.r = router
-}
-
 func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
 	switch RPC_MSGID(msgId) {
 	case RPC_MSGID(net.MSGID_CONNECT_CONNECTED):
@@ -235,8 +229,7 @@ func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 		fwlogger.D("@call method %s(%d) with args %s", call.Method, call.CallSeq, call.Args)
 		args := Args{}
 		args.FromRPCMap(&call.Args)
-		ctx := &Context{conn: conn, callSeq: call.CallSeq, Method: call.Method, Args: args}
-		c.r.Invoke(c.EndName, call.Method, ctx)
+		c.OnCallFunc(conn, call.CallSeq, call.Method, args)
 	case RPC_MSGID_RETURN:
 		ret := &RPCMethodReturn{}
 		defaultCodec.Unmarshal(body, ret)

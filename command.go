@@ -59,6 +59,14 @@ type LogConfig struct {
 	FileScanInterval    int
 }
 
+type DBConfig struct {
+	Addr     string
+	User     string
+	Pwd      string
+	Db       string
+	TbPrefix string
+}
+
 type AppConfig struct {
 	Name       string
 	ModelName  string       `json:"app"`
@@ -67,6 +75,7 @@ type AppConfig struct {
 	Rpc        *RPCConfig
 	Config     map[string]interface{}
 	LogConfigs []*LogConfig `json:"log"`
+	DB         map[string]*DBConfig
 }
 
 type Config struct {
@@ -316,6 +325,14 @@ func runApp(appName string) {
 		}
 	}
 	app.AddModule(module.NewServiceModule(services))
+	// db
+	for t, c := range a.DB {
+		if t == "mongo" {
+
+		} else if t == "mysql" {
+
+		}
+	}
 	runningApp[a.Name] = app
 }
 

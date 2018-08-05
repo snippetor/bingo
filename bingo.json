@@ -64,9 +64,22 @@
           "fileScanInterval": 3
         }
       ],
+      "db": {
+        "mongo": {
+          "addr": "localhost:27017",
+          "user": "root",
+          "pwd": "123456",
+          "db": "test"
+        },
+        "mysql": {
+          "addr": "localhost:3306",
+          "user": "root",
+          "pwd": "123456",
+          "db": "test",
+          "tbPrefix": "tb"
+        }
+      },
       "config": {
-        "dbName": "ddz",
-        "dbPwd": "test",
         "port": 100
       }
     },

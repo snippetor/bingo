@@ -58,7 +58,3 @@ func (c *RpcContext) ReturnNil() {
 		fwlogger.E("-- return rpc method %s failed! send message failed --", c.Method)
 	}
 }
-
-func (c *RpcContext) ConnectionIdentify() uint32 {
-	return c.Conn.Identity()
-}

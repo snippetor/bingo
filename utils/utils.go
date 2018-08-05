@@ -16,6 +16,7 @@ package utils
 
 import (
 	"os"
+	"reflect"
 )
 
 func IsFileExists(name string) bool {
@@ -27,3 +28,6 @@ func IsFileExists(name string) bool {
 	return true
 }
 
+func IsImplements(sub interface{}, supper interface{}) bool {
+	return reflect.TypeOf(sub).Implements(reflect.TypeOf(supper))
+}

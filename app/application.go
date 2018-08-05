@@ -18,6 +18,7 @@ import (
 	"github.com/snippetor/bingo/utils"
 	"github.com/snippetor/bingo/module"
 	"reflect"
+	"github.com/snippetor/bingo/route"
 )
 
 type Application interface {
@@ -28,6 +29,14 @@ type Application interface {
 	Service() module.ServiceModule
 	Log() module.LogModule
 	Config() utils.ValueMap
+
+	// 使用中间件，中间件将在其他Handler之前执行
+	Use(middleware ...route.Handler)
+	GlobalMiddleWares() route.Handlers
+
+	RpcCtxPool() *route.Pool
+	ServiceCtxPool() *route.Pool
+	WebApiCtxPool() *route.Pool
 }
 
 var _ Application = (*application)(nil)
@@ -37,10 +46,35 @@ type application struct {
 	name    string
 	config  utils.ValueMap
 	modules map[string]module.Module
+
+	rpcCtxPool     *route.Pool
+	serviceCtxPool *route.Pool
+	webApiCtxPool  *route.Pool
+
+	globalMiddleWares route.Handlers
 }
 
 func New(name string, config utils.ValueMap) Application {
-	a := &application{name, config, make(map[string]module.Module)}
+	a := &application{
+		name:    name,
+		config:  config,
+		modules: make(map[string]module.Module),
+	}
+	a.rpcCtxPool = route.NewPool(func() route.Context {
+		return &route.RpcContext{
+			Context: route.NewContext(a),
+		}
+	})
+	a.serviceCtxPool = route.NewPool(func() route.Context {
+		return &route.ServiceContext{
+			Context: route.NewContext(a),
+		}
+	})
+	a.webApiCtxPool = route.NewPool(func() route.Context {
+		return &route.WebApiContext{
+			Context: route.NewContext(a),
+		}
+	})
 	return a
 }
 
@@ -59,6 +93,16 @@ func (a *application) GetModule(module module.Module) module.Module {
 	return nil
 }
 
+func (a *application) Use(middleware ...route.Handler) {
+	a.globalMiddleWares = append(a.globalMiddleWares, middleware...)
+}
+
+func (a *application) GlobalMiddleWares() route.Handlers {
+	clone := make(route.Handlers, len(a.globalMiddleWares))
+	copy(clone, a.globalMiddleWares)
+	return clone
+}
+
 func (a *application) RPC() module.RPCModule {
 	return a.modules["*module.RPCModule"].(module.RPCModule)
 }
@@ -73,6 +117,18 @@ func (a *application) Log() module.LogModule {
 
 func (a *application) Config() utils.ValueMap {
 	return a.config
+}
+
+func (a *application) RpcCtxPool() *route.Pool {
+	return a.rpcCtxPool
+}
+
+func (a *application) ServiceCtxPool() *route.Pool {
+	return a.serviceCtxPool
+}
+
+func (a *application) WebApiCtxPool() *route.Pool {
+	return a.webApiCtxPool
 }
 
 func (a *application) Destroy() {

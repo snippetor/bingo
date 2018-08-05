@@ -2,7 +2,7 @@ package route
 
 import (
 	"github.com/snippetor/bingo/net"
-	"fmt"
+	"github.com/snippetor/bingo/codec"
 )
 
 type ServiceContext struct {
@@ -12,7 +12,17 @@ type ServiceContext struct {
 	MessageGroup int32
 	MessageExtra int32
 	MessageId    int32 // unpacked id
-	MessageBody  net.MessageBody
+	MessageBody  *MessageBodyWrapper
+	Codec        codec.ICodec
+}
+
+type MessageBodyWrapper struct {
+	RawContent net.MessageBody
+	Codec      codec.ICodec
+}
+
+func (c *MessageBodyWrapper) Unmarshal(v interface{}) {
+	c.Codec.Unmarshal(c.RawContent, v)
 }
 
 // The only one important if you will override the Context
@@ -29,25 +39,28 @@ func (c *ServiceContext) Next() {
 	Next(c)
 }
 
-func (c *ServiceContext) Ack(body net.MessageBody) {
+func (c *ServiceContext) Ack(body interface{}) {
 	if c.Conn == nil {
-		panic(fmt.Sprintf("[ack] lost connection, app=%s ctx=%v", c.App().Name(), c.Id()))
+		c.LogE("[ack] lost connection, app=%s ctx=%v", c.App().Name(), c.Id())
+		return
 	}
-	c.Conn.Send(net.PackId(net.MsgTypeAck, c.MessageGroup, c.MessageExtra, c.MessageId), body)
+	c.Conn.Send(net.PackId(net.MsgTypeAck, c.MessageGroup, c.MessageExtra, c.MessageId), c.Codec.Marshal(body))
 }
 
 //Note that: just send to the requester
-func (c *ServiceContext) Ntf(body net.MessageBody) {
+func (c *ServiceContext) Ntf(body interface{}) {
 	if c.Conn == nil {
-		panic(fmt.Sprintf("[ntf] lost connection, app=%s ctx=%v", c.App().Name(), c.Id()))
+		c.LogE("[ntf] lost connection, app=%s ctx=%v", c.App().Name(), c.Id())
+		return
 	}
-	c.Conn.Send(net.PackId(net.MsgTypeNtf, c.MessageGroup, c.MessageExtra, c.MessageId), body)
+	c.Conn.Send(net.PackId(net.MsgTypeNtf, c.MessageGroup, c.MessageExtra, c.MessageId), c.Codec.Marshal(body))
 }
 
 //Note that: just send to the requester
-func (c *ServiceContext) Cmd(body net.MessageBody) {
+func (c *ServiceContext) Cmd(body interface{}) {
 	if c.Conn == nil {
-		panic(fmt.Sprintf("[cmd] lost connection, app=%s ctx=%v", c.App().Name(), c.Id()))
+		c.LogE("[cmd] lost connection, app=%s ctx=%v", c.App().Name(), c.Id())
+		return
 	}
-	c.Conn.Send(net.PackId(net.MsgTypeCmd, c.MessageGroup, c.MessageExtra, c.MessageId), body)
+	c.Conn.Send(net.PackId(net.MsgTypeCmd, c.MessageGroup, c.MessageExtra, c.MessageId), c.Codec.Marshal(body))
 }

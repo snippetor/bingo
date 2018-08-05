@@ -29,6 +29,9 @@ import (
 	"github.com/snippetor/bingo/route"
 	"github.com/snippetor/bingo/app"
 	"github.com/snippetor/bingo/mvc"
+	"github.com/snippetor/bingo/codec"
+	"github.com/snippetor/bingo/middleware/recover"
+	"github.com/snippetor/bingo/middleware/latency"
 )
 
 type Service struct {
@@ -38,7 +41,7 @@ type Service struct {
 	Codec string
 }
 
-type RPC struct {
+type RPCConfig struct {
 	Port int      `json:"port"`
 	To   []string `json:"to"`
 }
@@ -58,12 +61,12 @@ type LogConfig struct {
 
 type AppConfig struct {
 	Name       string
-	ModelName  string                 `json:"application"`
+	ModelName  string       `json:"app"`
 	Domain     int
-	Services   []*Service             `json:"service"`
-	Rpc        *RPC                   `json:"rpc"`
-	Config     map[string]interface{} `json:"config"`
-	LogConfigs []*LogConfig           `json:"log"`
+	Services   []*Service   `json:"service"`
+	Rpc        *RPCConfig
+	Config     map[string]interface{}
+	LogConfigs []*LogConfig `json:"log"`
 }
 
 type Config struct {
@@ -74,9 +77,9 @@ type Config struct {
 type StartUpFunc func(app.Application) []interface{}
 
 var (
-	config     *Config
-	router     route.Router
-	runningApp = make(map[string]app.Application)
+	config      *Config
+	router      route.Router
+	runningApp  = make(map[string]app.Application)
 	startUpFunc = make(map[string]StartUpFunc)
 )
 
@@ -125,33 +128,21 @@ func runApp(appName string) {
 	}
 	// new application
 	app := app.New(a.Name, appConfig)
+	// middleware
+	app.Use(recover.New(), latency.New())
 	// init mvc objects
-	objs := mvcObjects[appName]
-	if objs != nil {
-		for _, obj := range objs {
-			if mvc.IsController(obj) {
-				obj.(mvc.Controller).Route(router)
-			} else {
-				//TODO model
+	if f, ok := startUpFunc[appName]; ok {
+		objs := f(app)
+		if objs != nil {
+			for _, obj := range objs {
+				if mvc.IsController(obj) {
+					obj.(mvc.Controller).Route(router)
+				} else {
+					//TODO model
+				}
 			}
 		}
 	}
-	// context pool
-	serviceCtxPool = route.NewPool(func() route.Context {
-		return &route.ServiceContext{
-			Context: route.NewContext(app),
-		}
-	})
-	rpcCtxPool = route.NewPool(func() route.Context {
-		return &route.RpcContext{
-			Context: route.NewContext(app),
-		}
-	})
-	webApiCtxPool = route.NewPool(func() route.Context {
-		return &route.WebApiContext{
-			Context: route.NewContext(app),
-		}
-	})
 	// log
 	/**
 	"level": 0,
@@ -222,13 +213,13 @@ func runApp(appName string) {
 			if r, ok := router.(interface {
 				OnRPCRequest(method string, ctx route.Context)
 			}); ok {
-				ctx := rpcCtxPool.Acquire().(*route.RpcContext)
+				ctx := app.RpcCtxPool().Acquire().(*route.RpcContext)
 				ctx.Conn = conn
 				ctx.CallSeq = seq
 				ctx.Method = method
 				ctx.Args = args
 				ctx.Caller = caller
-				defer rpcCtxPool.Release(ctx)
+				defer app.RpcCtxPool().Release(ctx)
 				r.OnRPCRequest(method, ctx)
 			}
 		})
@@ -242,13 +233,13 @@ func runApp(appName string) {
 				if r, ok := router.(interface {
 					OnRPCRequest(method string, ctx route.Context)
 				}); ok {
-					ctx := rpcCtxPool.Acquire().(*route.RpcContext)
+					ctx := app.RpcCtxPool().Acquire().(*route.RpcContext)
 					ctx.Conn = conn
 					ctx.CallSeq = seq
 					ctx.Method = method
 					ctx.Args = args
 					ctx.Caller = caller
-					defer rpcCtxPool.Release(ctx)
+					defer app.RpcCtxPool().Release(ctx)
 					r.OnRPCRequest(method, ctx)
 				}
 			})
@@ -259,20 +250,29 @@ func runApp(appName string) {
 	// service
 	services := module.Services{}
 	for _, s := range a.Services {
+		var c codec.ICodec
+		if strings.ToLower(s.Codec) == "json" {
+			c = codec.NewCodec(codec.Json)
+		} else if strings.ToLower(s.Codec) == "protobuf" {
+			c = codec.NewCodec(codec.Protobuf)
+		} else {
+			c = codec.NewCodec(codec.Json)
+		}
 		switch strings.ToLower(s.Type) {
 		case "tcp":
 			serv := net.GoListen(net.Tcp, s.Port, func(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
 				if r, ok := router.(interface {
 					OnServiceRequest(net.MessageId, route.Context)
 				}); ok {
-					ctx := serviceCtxPool.Acquire().(*route.ServiceContext)
+					ctx := app.ServiceCtxPool().Acquire().(*route.ServiceContext)
 					ctx.Conn = conn
 					ctx.MessageId = msgId.MsgId()
 					ctx.MessageType = msgId.Type()
 					ctx.MessageGroup = msgId.Group()
 					ctx.MessageExtra = msgId.Extra()
-					ctx.MessageBody = body
-					defer serviceCtxPool.Release(ctx)
+					ctx.MessageBody = &route.MessageBodyWrapper{body, c}
+					ctx.Codec = c
+					defer app.ServiceCtxPool().Release(ctx)
 					r.OnServiceRequest(msgId, ctx)
 				}
 			})
@@ -282,13 +282,15 @@ func runApp(appName string) {
 				if r, ok := router.(interface {
 					OnServiceRequest(net.MessageId, route.Context)
 				}); ok {
-					ctx := serviceCtxPool.Acquire().(*route.ServiceContext)
+					ctx := app.ServiceCtxPool().Acquire().(*route.ServiceContext)
 					ctx.Conn = conn
 					ctx.MessageId = msgId.MsgId()
 					ctx.MessageType = msgId.Type()
 					ctx.MessageGroup = msgId.Group()
 					ctx.MessageExtra = msgId.Extra()
-					defer serviceCtxPool.Release(ctx)
+					ctx.MessageBody = &route.MessageBodyWrapper{body, c}
+					ctx.Codec = c
+					defer app.ServiceCtxPool().Release(ctx)
 					r.OnServiceRequest(msgId, ctx)
 				}
 			})
@@ -296,15 +298,16 @@ func runApp(appName string) {
 		case "http":
 			go func() {
 				fwlogger.D("-- http service start on %s --", strconv.Itoa(s.Port))
-				if err := fasthttp.ListenAndServe(":"+strconv.Itoa(s.Port), func(c *fasthttp.RequestCtx) {
-					fwlogger.D("====> %s %s", string(c.Path()), string(c.Request.Body()))
+				if err := fasthttp.ListenAndServe(":"+strconv.Itoa(s.Port), func(req *fasthttp.RequestCtx) {
+					fwlogger.D("====> %s %s", string(req.Path()), string(req.Request.Body()))
 					if r, ok := router.(interface {
 						OnWebApiRequest(string, route.Context)
 					}); ok {
-						ctx := webApiCtxPool.Acquire().(*route.WebApiContext)
-						ctx.RequestCtx = c
-						defer webApiCtxPool.Release(ctx)
-						r.OnWebApiRequest(string(c.Path()), ctx)
+						ctx := app.WebApiCtxPool().Acquire().(*route.WebApiContext)
+						ctx.RequestCtx = req
+						ctx.Codec = c
+						defer app.WebApiCtxPool().Release(ctx)
+						r.OnWebApiRequest(string(req.Path()), ctx)
 					}
 				}); err != nil {
 					fwlogger.E("-- startup http service failed! %s --", err.Error())
@@ -333,7 +336,7 @@ func stop(appName string) {
 
 func runAll() {
 	for _, n := range config.Apps {
-		runApp(n)
+		runApp(n.Name)
 	}
 }
 

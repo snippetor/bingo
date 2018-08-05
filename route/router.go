@@ -64,25 +64,43 @@ func (r *router) HandleServiceMessage(msgId interface{}, handlers ...Handler) {
 func (r *router) OnWebApiRequest(path string, ctx Context) {
 	mixed := r.mix("API", path)
 	if hs, ok := r.routes[mixed]; ok {
-		ctx.Do(hs)
+		var newHandlers Handlers
+		globalMiddleWares := ctx.App().GlobalMiddleWares()
+		if r.apply(&globalMiddleWares) {
+			newHandlers = append(newHandlers, globalMiddleWares...)
+		}
+		newHandlers = append(newHandlers, hs...)
+		ctx.Do(newHandlers)
 	}
 }
 
 func (r *router) OnRPCRequest(method string, ctx Context) {
 	mixed := r.mix("RPC", method)
 	if hs, ok := r.routes[mixed]; ok {
-		ctx.Do(hs)
+		var newHandlers Handlers
+		globalMiddleWares := ctx.App().GlobalMiddleWares()
+		if r.apply(&globalMiddleWares) {
+			newHandlers = append(newHandlers, globalMiddleWares...)
+		}
+		newHandlers = append(newHandlers, hs...)
+		ctx.Do(newHandlers)
 	}
 }
 
 func (r *router) OnServiceRequest(msgId net.MessageId, ctx Context) {
 	mixed := r.mix("MSG", msgId)
 	if hs, ok := r.routes[mixed]; ok {
-		ctx.Do(hs)
+		var newHandlers Handlers
+		globalMiddleWares := ctx.App().GlobalMiddleWares()
+		if r.apply(&globalMiddleWares) {
+			newHandlers = append(newHandlers, globalMiddleWares...)
+		}
+		newHandlers = append(newHandlers, hs...)
+		ctx.Do(newHandlers)
 	}
 }
 
-func (r router) buildHandler(h Handler) Handler {
+func (r *router) buildHandler(h Handler) Handler {
 	return func(ctx Context) {
 		// Proceed will fire the handler and return false here if it doesn't contain a `ctx.Next()`,
 		// so we add the `ctx.Next()` wherever is necessary in order to eliminate any dev's misuse.
@@ -93,7 +111,7 @@ func (r router) buildHandler(h Handler) Handler {
 	}
 }
 
-func (r router) apply(handlers *Handlers) bool {
+func (r *router) apply(handlers *Handlers) bool {
 	tmp := *handlers
 	for i, h := range tmp {
 		if h == nil {

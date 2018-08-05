@@ -16,10 +16,8 @@ package net
 
 import (
 	errors1 "errors"
-	"encoding/json"
-	"github.com/snippetor/bingo/errors"
-	"github.com/gogo/protobuf/proto"
 	"github.com/snippetor/bingo/utils"
+	"github.com/snippetor/bingo/codec"
 )
 
 /**
@@ -39,26 +37,6 @@ const (
 
 type MessageId int32
 type MessageBody []byte
-
-func (b MessageBody) ToJson(v interface{}) bool {
-	return json.Unmarshal(b, v) == nil
-}
-
-func (b MessageBody) ToProtobuf(v interface{}) bool {
-	return proto.Unmarshal(b, v.(proto.Message)) == nil
-}
-
-func (b MessageBody) FromJson(v interface{}) {
-	res, err := json.Marshal(v)
-	errors.Check(err)
-	copy(b, res)
-}
-
-func (b MessageBody) FromProtobuf(v interface{}) {
-	res, err := proto.Marshal(v.(proto.Message))
-	errors.Check(err)
-	copy(b, res)
-}
 
 func (i MessageId) Int32() int32 {
 	return int32(i)

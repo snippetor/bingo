@@ -2,14 +2,13 @@ package route
 
 import (
 	"github.com/valyala/fasthttp"
-	"github.com/bitly/go-simplejson"
-	"github.com/snippetor/bingo/errors"
-	"encoding/json"
+	"github.com/snippetor/bingo/codec"
 )
 
 type WebApiContext struct {
 	Context
 	RequestCtx *fasthttp.RequestCtx
+	Codec      codec.ICodec
 }
 
 // The only one important if you will override the Context
@@ -26,30 +25,22 @@ func (c *WebApiContext) Next() {
 	Next(c)
 }
 
-func (c *WebApiContext) RequestBody() *simplejson.Json {
-	j, err := simplejson.NewJson(c.RequestCtx.Request.Body())
-	errors.Check(err)
-	return j
+func (c *WebApiContext) RequestBody(body interface{}) {
+	c.Codec.Unmarshal(c.RequestCtx.Request.Body(), body)
 }
 
 func (c *WebApiContext) ResponseOK(body interface{}) {
 	c.RequestCtx.Response.SetStatusCode(fasthttp.StatusOK)
-	if bs, err := json.Marshal(body); err == nil {
-		c.RequestCtx.Response.SetBody(bs)
-		c.LogD("<==== %s %s", string(c.RequestCtx.Path()), string(bs))
-	} else {
-		c.LogE("send Failed !!!! %s", err.Error())
-	}
+	bs := c.Codec.Marshal(body)
+	c.RequestCtx.Response.SetBody(bs)
+	c.LogD("<==== %s %s", string(c.RequestCtx.Path()), string(bs))
 }
 
 func (c *WebApiContext) ResponseFailed(reason string) {
 	c.RequestCtx.Response.SetStatusCode(fasthttp.StatusOK)
-	j := simplejson.New()
-	j.Set("error", reason)
-	if bs, err := j.Encode(); err == nil {
-		c.RequestCtx.Response.SetBody(bs)
-		c.LogD("<==== %s %s", string(c.RequestCtx.Path()), string(bs))
-	} else {
-		c.LogE("send Failed !!!! %s", err.Error())
-	}
+	params := make(map[string]interface{})
+	params["error"] = reason
+	bs := c.Codec.Marshal(params)
+	c.RequestCtx.Response.SetBody(bs)
+	c.LogD("<==== %s %s", string(c.RequestCtx.Path()), string(bs))
 }

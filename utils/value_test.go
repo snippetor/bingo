@@ -6,7 +6,8 @@ import (
 )
 
 func TestValue_Set(t *testing.T) {
-	v := NewValue("test")
+	v := NewValue()
+	v.Set("test")
 	fmt.Println(v.GetString())
 
 

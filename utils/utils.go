@@ -28,6 +28,20 @@ func IsFileExists(name string) bool {
 	return true
 }
 
-func IsImplements(sub interface{}, supper interface{}) bool {
-	return reflect.TypeOf(sub).Implements(reflect.TypeOf(supper))
+func StructName(i interface{}) string {
+	t := reflect.TypeOf(i)
+	if t.Kind() == reflect.Ptr {
+		return t.Elem().Name()
+	} else {
+		return t.Name()
+	}
+}
+
+func ElementName(i interface{}) string {
+	t := reflect.TypeOf(i)
+	if t.Kind() == reflect.Ptr {
+		return t.Elem().Elem().Name()
+	} else {
+		return t.Elem().Name()
+	}
 }

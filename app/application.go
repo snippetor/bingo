@@ -28,6 +28,7 @@ type Application interface {
 	RPC() module.RPCModule
 	Service() module.ServiceModule
 	Log() module.LogModule
+	MySql() module.MySqlModule
 	Config() utils.ValueMap
 
 	// 使用中间件，中间件将在其他Handler之前执行
@@ -113,6 +114,10 @@ func (a *application) Service() module.ServiceModule {
 
 func (a *application) Log() module.LogModule {
 	return a.modules["*module.LogModule"].(module.LogModule)
+}
+
+func (a *application) MySql() module.MySqlModule {
+	return a.modules["*module.MySqlModule"].(module.MySqlModule)
 }
 
 func (a *application) Config() utils.ValueMap {

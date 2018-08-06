@@ -19,7 +19,9 @@ func NewValueMap() ValueMap {
 }
 
 func (m *vm) Put(key string, value interface{}) {
-	m.inner[key] = NewValue(value)
+	v := NewValue()
+	v.Set(value)
+	m.inner[key] = v
 }
 
 func (m *vm) Get(key string) Value {

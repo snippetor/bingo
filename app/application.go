@@ -108,23 +108,43 @@ func (a *application) GlobalMiddleWares() route.Handlers {
 }
 
 func (a *application) RPC() module.RPCModule {
-	return a.modules["*module.RPCModule"].(module.RPCModule)
+	m, ok := a.modules["*module.RPCModule"]
+	if ok {
+		return m.(module.RPCModule)
+	}
+	return nil
 }
 
 func (a *application) Service() module.ServiceModule {
-	return a.modules["*module.ServiceModule"].(module.ServiceModule)
+	m, ok := a.modules["*module.ServiceModule"]
+	if ok {
+		return m.(module.ServiceModule)
+	}
+	return nil
 }
 
 func (a *application) Log() module.LogModule {
-	return a.modules["*module.LogModule"].(module.LogModule)
+	m, ok := a.modules["*module.LogModule"]
+	if ok {
+		return m.(module.LogModule)
+	}
+	return nil
 }
 
 func (a *application) MySql() module.MySqlModule {
-	return a.modules["*module.MySqlModule"].(module.MySqlModule)
+	m, ok := a.modules["*module.MySqlModule"]
+	if ok {
+		return m.(module.MySqlModule)
+	}
+	return nil
 }
 
 func (a *application) Mongo() module.MongoModule {
-	return a.modules["*module.MongoModule"].(module.MongoModule)
+	m, ok := a.modules["*module.MongoModule"]
+	if ok {
+		return m.(module.MongoModule)
+	}
+	return nil
 }
 
 func (a *application) Config() utils.ValueMap {

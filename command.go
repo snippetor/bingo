@@ -145,7 +145,9 @@ func runApp(appName string) {
 		if objs != nil {
 			for _, obj := range objs {
 				if mvc.IsController(obj) {
-					obj.(mvc.Controller).Route(router)
+					builder := route.NewRouterBuild(router, obj)
+					obj.(mvc.Controller).Route(builder)
+					builder.Build()
 				} else {
 					//TODO model
 				}
@@ -328,7 +330,7 @@ func runApp(appName string) {
 	// db
 	for t, c := range a.DB {
 		if t == "mongo" {
-
+			app.AddModule(module.NewMongoModule(app, c.Addr, c.User, c.Pwd, c.Db))
 		} else if t == "mysql" {
 			app.AddModule(module.NewMysqlModule(app, c.Addr, c.User, c.Pwd, c.Db, c.TbPrefix))
 		}

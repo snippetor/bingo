@@ -31,11 +31,11 @@ type mysqlModule struct {
 
 func NewMysqlModule(app app.Application, addr, username, pwd, defaultDb, tbPrefix string) MySqlModule {
 	m := &mysqlModule{app: app, tbPrefix: tbPrefix}
-	m.dial(app, addr, username, pwd, defaultDb)
+	m.dial(addr, username, pwd, defaultDb)
 	return m
 }
 
-func (m *mysqlModule) dial(app app.Application, addr, username, pwd, defaultDb string) {
+func (m *mysqlModule) dial(addr, username, pwd, defaultDb string) {
 	// db
 	db, err := gorm.Open("mysql", username+":"+pwd+"@tcp("+addr+")/"+defaultDb+"?charset=utf8&parseTime=True&loc=Local")
 	errors.Check(err)

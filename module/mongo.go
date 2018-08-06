@@ -6,11 +6,11 @@ import (
 	"time"
 	"gopkg.in/mgo.v2/bson"
 	"github.com/snippetor/bingo/utils"
+	"github.com/snippetor/bingo/app"
 )
 
 type MongoModule interface {
 	Module
-	Dial(addr, user, pwd, db string)
 	Session() *mgo.Session
 	Create(model interface{})
 	CreateMany(models interface{})
@@ -20,10 +20,17 @@ type MongoModule interface {
 }
 
 type mongoModule struct {
+	app     app.Application
 	session *mgo.Session
 }
 
-func (m *mongoModule) Dial(addr, user, pwd, defaultDb string) {
+func NewMongoModule(app app.Application, addr, username, pwd, defaultDb string) MongoModule {
+	m := &mongoModule{app: app}
+	m.dial(addr, username, pwd, defaultDb)
+	return m
+}
+
+func (m *mongoModule) dial(addr, user, pwd, defaultDb string) {
 	//[mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]
 	//mongodb://myuser:mypass@localhost:40001,otherhost:40001/
 	session, err := mgo.DialWithInfo(&mgo.DialInfo{

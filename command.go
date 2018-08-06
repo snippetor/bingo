@@ -330,7 +330,7 @@ func runApp(appName string) {
 		if t == "mongo" {
 
 		} else if t == "mysql" {
-
+			app.AddModule(module.NewMysqlModule(app, c.Addr, c.User, c.Pwd, c.Db, c.TbPrefix))
 		}
 	}
 	runningApp[a.Name] = app

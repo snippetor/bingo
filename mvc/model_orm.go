@@ -8,7 +8,7 @@ import (
 )
 
 type OrmModel interface {
-	Init(app app.Application, db *gorm.DB, self OrmModel)
+	Init(app app.Application, self OrmModel)
 	App() app.Application
 	DB() *gorm.DB
 	Sync(cols ...interface{})
@@ -21,13 +21,12 @@ type OrmModel interface {
 
 type MysqlOrmModel struct {
 	app  app.Application
-	db   *gorm.DB
 	self OrmModel
+	Id   uint32 `gorm:"primary_key"`
 }
 
-func (m *MysqlOrmModel) Init(app app.Application, db *gorm.DB, self OrmModel) {
+func (m *MysqlOrmModel) Init(app app.Application, self OrmModel) {
 	m.app = app
-	m.db = db
 	m.self = self
 }
 
@@ -36,10 +35,7 @@ func (m *MysqlOrmModel) App() app.Application {
 }
 
 func (m *MysqlOrmModel) DB() *gorm.DB {
-	if m.db == nil {
-		panic("-- db is nil in OrmModel --")
-	}
-	return m.db
+	return m.App().MySql().DB()
 }
 
 // 更新到数据库

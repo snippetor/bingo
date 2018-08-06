@@ -17,7 +17,6 @@ type MongoModule interface {
 	FindAll(models interface{})
 	FindMany(bson bson.M, models interface{})
 	Find(bson bson.M, model interface{})
-	Del(bson bson.M, model interface{})
 }
 
 type mongoModule struct {
@@ -81,14 +80,6 @@ func (m *mongoModule) Find(bson bson.M, model interface{}) {
 	defer session.Close()
 	c := session.DB("").C(utils.StructName(model))
 	err := c.Find(bson).One(model)
-	errors.Check(err)
-}
-
-func (m *mongoModule) Del(bson bson.M, model interface{}) {
-	session := m.Session()
-	defer session.Close()
-	c := session.DB("").C(utils.StructName(model))
-	err := c.Remove(bson)
 	errors.Check(err)
 }
 

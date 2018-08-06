@@ -10,7 +10,6 @@ import (
 
 type MySqlModule interface {
 	Module
-	Dial(app app.Application, addr, username, pwd, defaultDb, tbPrefix string)
 	DB() *gorm.DB
 	TableName(tbName string) string
 	AutoMigrate(model mvc.OrmModel)
@@ -30,15 +29,19 @@ type mysqlModule struct {
 	tbPrefix string
 }
 
-func (m *mysqlModule) Dial(app app.Application, addr, username, pwd, defaultDb, tbPrefix string) {
-	m.app = app
+func NewMysqlModule(app app.Application, addr, username, pwd, defaultDb, tbPrefix string) MySqlModule {
+	m := &mysqlModule{app: app, tbPrefix: tbPrefix}
+	m.dial(app, addr, username, pwd, defaultDb)
+	return m
+}
+
+func (m *mysqlModule) dial(app app.Application, addr, username, pwd, defaultDb string) {
 	// db
 	db, err := gorm.Open("mysql", username+":"+pwd+"@tcp("+addr+")/"+defaultDb+"?charset=utf8&parseTime=True&loc=Local")
 	errors.Check(err)
 	m.db = db
-	m.tbPrefix = tbPrefix
 	gorm.DefaultTableNameHandler = func(db *gorm.DB, defaultTableName string) string {
-		return tbPrefix + "_" + defaultTableName
+		return m.tbPrefix + "_" + defaultTableName
 	}
 	//db.LogMode(true)
 }
@@ -58,12 +61,12 @@ func (m *mysqlModule) TableName(tbName string) string {
 }
 
 func (m *mysqlModule) AutoMigrate(model mvc.OrmModel) {
-	model.Init(m.app, m.db, model)
+	model.Init(m.app, model)
 	m.DB().AutoMigrate(model)
 }
 
 func (m *mysqlModule) Create(model mvc.OrmModel) bool {
-	model.Init(m.app, m.db, model)
+	model.Init(m.app, model)
 	res := m.DB().Create(model)
 	if res.Error != nil {
 		panic(res.Error)
@@ -72,7 +75,7 @@ func (m *mysqlModule) Create(model mvc.OrmModel) bool {
 }
 
 func (m *mysqlModule) Find(model mvc.OrmModel) bool {
-	model.Init(m.app, m.db, model)
+	model.Init(m.app, model)
 	res := m.DB().Where(model).First(model)
 	return res.Error == nil
 }

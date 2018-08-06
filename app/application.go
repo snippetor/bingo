@@ -23,12 +23,15 @@ import (
 
 type Application interface {
 	Name() string
+
+	// modules
 	AddModule(module.Module)
 	GetModule(module.Module) module.Module
 	RPC() module.RPCModule
 	Service() module.ServiceModule
 	Log() module.LogModule
 	MySql() module.MySqlModule
+	Mongo() module.MongoModule
 	Config() utils.ValueMap
 
 	// 使用中间件，中间件将在其他Handler之前执行
@@ -118,6 +121,10 @@ func (a *application) Log() module.LogModule {
 
 func (a *application) MySql() module.MySqlModule {
 	return a.modules["*module.MySqlModule"].(module.MySqlModule)
+}
+
+func (a *application) Mongo() module.MongoModule {
+	return a.modules["*module.MongoModule"].(module.MongoModule)
 }
 
 func (a *application) Config() utils.ValueMap {

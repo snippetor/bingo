@@ -2,13 +2,13 @@ package route
 
 import (
 	"fmt"
-	"github.com/snippetor/bingo/net"
 	"reflect"
+	"github.com/snippetor/bingo/net"
 )
 
 type RouterBuilder interface {
 	HandleWebApi(path interface{}, method string, middleware ...Handler)
-	HandleRPCMethod(method string, handlers ...Handler)
+	HandleRPCMethod(method string, middleware ...Handler)
 	HandleServiceMessage(msgId interface{}, method string, middleware ...Handler)
 	Build()
 }
@@ -30,22 +30,22 @@ func NewRouterBuild(router Router, ctrl interface{}) RouterBuilder {
 }
 
 func (r *routerBuilder) HandleWebApi(path interface{}, method string, middleware ...Handler) {
-	r.methods = append(r.methods, &routerMethod{r.router.mix("API", path), method, middleware})
+	r.methods = append(r.methods, &routerMethod{Mix("API", path), method, middleware})
 }
 
 func (r *routerBuilder) HandleRPCMethod(method string, middleware ...Handler) {
-	r.methods = append(r.methods, &routerMethod{r.router.mix("RPC", method), method, middleware})
+	r.methods = append(r.methods, &routerMethod{Mix("RPC", method), method, middleware})
 }
 
 func (r *routerBuilder) HandleServiceMessage(msgId interface{}, method string, middleware ...Handler) {
-	r.methods = append(r.methods, &routerMethod{r.router.mix("MSG", msgId), method, middleware})
+	r.methods = append(r.methods, &routerMethod{Mix("MSG", msgId), method, middleware})
 }
 
 func (r *routerBuilder) Build() {
 	for _, m := range r.methods {
 		if method, ok := reflect.TypeOf(r.ctrl).MethodByName(m.method); ok {
 			var call = method.Func.Call
-			r.router.handle(m.key, func(ctx Context) {
+			r.router.Handle(m.key, func(ctx Context) {
 				call([]reflect.Value{reflect.ValueOf(ctx)})
 			})
 		}
@@ -53,12 +53,8 @@ func (r *routerBuilder) Build() {
 }
 
 type Router interface {
-	OnWebApiRequest(path string, ctx Context)
-	OnRPCRequest(method string, ctx Context)
-	OnServiceRequest(msgId net.MessageId, ctx Context)
-
-	handle(key string, handlers ...Handler)
-	mix(method string, path interface{}) string
+	Handle(key string, handlers ...Handler)
+	OnHandleRequest(ctx Context)
 }
 
 type router struct {
@@ -70,46 +66,57 @@ func NewRouter() Router {
 	return r
 }
 
-func (r *router) OnWebApiRequest(path string, ctx Context) {
-	mixed := r.mix("API", path)
-	if hs, ok := r.routes[mixed]; ok {
-		var newHandlers Handlers
-		globalMiddleWares := ctx.App().GlobalMiddleWares()
-		if r.apply(&globalMiddleWares) {
-			newHandlers = append(newHandlers, globalMiddleWares...)
+func (r *router) OnHandleRequest(ctx Context) {
+	switch ctx.(type) {
+	case *RpcContext:
+		mixed := Mix("RPC", ctx.(*RpcContext).Method)
+		if hs, ok := r.routes[mixed]; ok {
+			var newHandlers Handlers
+			globalMiddleWares := ctx.App().GlobalMiddleWares()
+			if r.apply(&globalMiddleWares) {
+				newHandlers = append(newHandlers, globalMiddleWares...)
+			}
+			newHandlers = append(newHandlers, hs...)
+			ctx.Do(newHandlers)
 		}
-		newHandlers = append(newHandlers, hs...)
-		ctx.Do(newHandlers)
+	case *WebApiContext:
+		mixed := Mix("API", string(ctx.(*WebApiContext).RequestCtx.Path()))
+		if hs, ok := r.routes[mixed]; ok {
+			var newHandlers Handlers
+			globalMiddleWares := ctx.App().GlobalMiddleWares()
+			if r.apply(&globalMiddleWares) {
+				newHandlers = append(newHandlers, globalMiddleWares...)
+			}
+			newHandlers = append(newHandlers, hs...)
+			ctx.Do(newHandlers)
+		}
+	case *ServiceContext:
+		c := ctx.(ServiceContext)
+		if c.MessageType != net.MsgTypeReq {
+			c.LogE("Ignore service message type=%d, group=%d, extra=%d id=%d", c.MessageType, c.MessageBody, c.MessageExtra, c.MessageId)
+			return
+		}
+		var mixed = []string{
+			Mix("MSG", net.PackId(c.MessageType, c.MessageGroup, c.MessageExtra, c.MessageId)),
+			Mix("MSG", net.PackId(c.MessageType, c.MessageGroup, c.MessageExtra, 0)),
+			Mix("MSG", net.PackId(c.MessageType, c.MessageGroup, 0, 0)),
+		}
+		for _, m := range mixed {
+			if hs, ok := r.routes[m]; ok {
+				var newHandlers Handlers
+				globalMiddleWares := c.App().GlobalMiddleWares()
+				if r.apply(&globalMiddleWares) {
+					newHandlers = append(newHandlers, globalMiddleWares...)
+				}
+				newHandlers = append(newHandlers, hs...)
+				c.Do(newHandlers)
+			}
+		}
 	}
+
 }
 
-func (r *router) OnRPCRequest(method string, ctx Context) {
-	mixed := r.mix("RPC", method)
-	if hs, ok := r.routes[mixed]; ok {
-		var newHandlers Handlers
-		globalMiddleWares := ctx.App().GlobalMiddleWares()
-		if r.apply(&globalMiddleWares) {
-			newHandlers = append(newHandlers, globalMiddleWares...)
-		}
-		newHandlers = append(newHandlers, hs...)
-		ctx.Do(newHandlers)
-	}
-}
-
-func (r *router) OnServiceRequest(msgId net.MessageId, ctx Context) {
-	mixed := r.mix("MSG", msgId)
-	if hs, ok := r.routes[mixed]; ok {
-		var newHandlers Handlers
-		globalMiddleWares := ctx.App().GlobalMiddleWares()
-		if r.apply(&globalMiddleWares) {
-			newHandlers = append(newHandlers, globalMiddleWares...)
-		}
-		newHandlers = append(newHandlers, hs...)
-		ctx.Do(newHandlers)
-	}
-}
-
-func (r *router) handle(key string, handlers ...Handler) {
+func (r *router) Handle(key string, handlers ...Handler) {
 	mainHandlers := Handlers(handlers)
 	if !r.apply(&mainHandlers) {
 		return
@@ -146,6 +153,6 @@ func (r *router) apply(handlers *Handlers) bool {
 	return true
 }
 
-func (r *router) mix(method string, path interface{}) string {
+func Mix(method string, path interface{}) string {
 	return fmt.Sprintf("%s:%v", method, path)
 }

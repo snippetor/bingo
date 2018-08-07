@@ -51,6 +51,17 @@ func New() route.Handler {
 				logMessage += fmt.Sprintf("Trace: %s\n", err)
 				logMessage += fmt.Sprintf("\n%s", stacktrace)
 				ctx.LogE(logMessage)
+				switch ctx.(type) {
+				case *route.RpcContext:
+					c := ctx.(*route.RpcContext)
+					c.ReturnNil()
+					//case *route.ServiceContext:
+					//c := ctx.(*route.ServiceContext)
+					//c.Ack(map[string]interface{}{"code": -1, "desc": fmt.Sprintf("%s", err)})
+				case *route.WebApiContext:
+					c := ctx.(*route.WebApiContext)
+					c.ResponseFailed(fmt.Sprintf("%s", err))
+				}
 				ctx.StopExecution()
 			}
 		}()

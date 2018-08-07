@@ -33,3 +33,7 @@ func (j *json) Marshal(v interface{}) net.MessageBody {
 func (j *json) Unmarshal(data net.MessageBody, v interface{}) {
 	errors.Check(json1.Unmarshal(data, v))
 }
+
+func (j *json) Type() int {
+	return int(Json)
+}

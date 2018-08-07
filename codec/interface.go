@@ -20,4 +20,5 @@ import "github.com/snippetor/bingo/net"
 type ICodec interface {
 	Marshal(interface{}) net.MessageBody
 	Unmarshal(net.MessageBody, interface{})
+	Type() int
 }

@@ -12,10 +12,10 @@ type MySqlModule interface {
 	Module
 	DB() *gorm.DB
 	TableName(tbName string) string
-	AutoMigrate(model mvc.OrmModel)
+	AutoMigrate(model mvc.MysqlOrmModel)
 
-	Create(model mvc.OrmModel) bool
-	Find(model mvc.OrmModel) bool
+	Create(model mvc.MysqlOrmModel) bool
+	Find(model mvc.MysqlOrmModel) bool
 	FindAll(models interface{}) bool
 	FindMany(models interface{}, limit int, orderBy string, whereAndArgs ... interface{}) bool
 	Begin() *gorm.DB
@@ -60,12 +60,12 @@ func (m *mysqlModule) TableName(tbName string) string {
 	return tbName
 }
 
-func (m *mysqlModule) AutoMigrate(model mvc.OrmModel) {
+func (m *mysqlModule) AutoMigrate(model mvc.MysqlOrmModel) {
 	model.Init(m.app, model)
 	m.DB().AutoMigrate(model)
 }
 
-func (m *mysqlModule) Create(model mvc.OrmModel) bool {
+func (m *mysqlModule) Create(model mvc.MysqlOrmModel) bool {
 	model.Init(m.app, model)
 	res := m.DB().Create(model)
 	if res.Error != nil {
@@ -74,7 +74,7 @@ func (m *mysqlModule) Create(model mvc.OrmModel) bool {
 	return true
 }
 
-func (m *mysqlModule) Find(model mvc.OrmModel) bool {
+func (m *mysqlModule) Find(model mvc.MysqlOrmModel) bool {
 	model.Init(m.app, model)
 	res := m.DB().Where(model).First(model)
 	return res.Error == nil

@@ -101,6 +101,10 @@ func RegisterApp(appName string, startupFunc StartUpFunc) {
 	startUpFunc[appName] = startupFunc
 }
 
+func AppConfigs() []*AppConfig {
+	return config.Apps
+}
+
 // 解析配置文件
 func parse(configPath string) {
 	content, err := ioutil.ReadFile(configPath)
@@ -127,7 +131,7 @@ func findApp(name string) *AppConfig {
 func runApp(appName string) {
 	a := findApp(appName)
 	if n == nil {
-		fwlogger.E("-- run application failed! not found application by name %s --", appName)
+		fwlogger.E("-- run thisApp failed! not found thisApp by name %s --", appName)
 		return
 	}
 	// config
@@ -135,21 +139,29 @@ func runApp(appName string) {
 	for k, v := range a.Config {
 		appConfig.Put(k, v)
 	}
-	// new application
-	app := app.New(a.Name, appConfig)
+	// new thisApp
+	thisApp := app.New(a.Name, appConfig)
 	// middleware
-	app.Use(recover.New(), latency.New())
+	thisApp.Use(recover.New(), latency.New())
+	// db
+	for t, c := range a.DB {
+		if t == "mongo" {
+			thisApp.AddModule(module.NewMongoModule(thisApp, c.Addr, c.User, c.Pwd, c.Db))
+		} else if t == "mysql" {
+			thisApp.AddModule(module.NewMysqlModule(thisApp, c.Addr, c.User, c.Pwd, c.Db, c.TbPrefix))
+		}
+	}
 	// init mvc objects
 	if f, ok := startUpFunc[appName]; ok {
-		objs := f(app)
+		objs := f(thisApp)
 		if objs != nil {
 			for _, obj := range objs {
 				if mvc.IsController(obj) {
 					builder := route.NewRouterBuild(router, obj)
 					obj.(mvc.Controller).Route(builder)
 					builder.Build()
-				} else {
-					//TODO model
+				} else if mvc.IsOrmModel(obj) {
+					thisApp.MySql().AutoMigrate(obj.(mvc.MysqlOrmModel))
 				}
 			}
 		}
@@ -215,24 +227,20 @@ func runApp(appName string) {
 			loggers[c.Name] = log.NewLoggerWithConfig(config)
 		}
 	}
-	app.AddModule(module.NewLogModule(loggers))
+	thisApp.AddModule(module.NewLogModule(loggers))
 	// rpc
 	var rpcServer *rpc.Server
 	if a.Rpc.Port > 0 {
 		rpcServer = &rpc.Server{}
 		rpcServer.Listen(a.Name, a.ModelName, a.Rpc.Port, func(conn net.IConn, caller string, seq uint32, method string, args *rpc.Args) {
-			if r, ok := router.(interface {
-				OnRPCRequest(method string, ctx route.Context)
-			}); ok {
-				ctx := app.RpcCtxPool().Acquire().(*route.RpcContext)
-				ctx.Conn = conn
-				ctx.CallSeq = seq
-				ctx.Method = method
-				ctx.Args = args
-				ctx.Caller = caller
-				defer app.RpcCtxPool().Release(ctx)
-				r.OnRPCRequest(method, ctx)
-			}
+			ctx := thisApp.RpcCtxPool().Acquire().(*route.RpcContext)
+			ctx.Conn = conn
+			ctx.CallSeq = seq
+			ctx.Method = method
+			ctx.Args = args
+			ctx.Caller = caller
+			defer thisApp.RpcCtxPool().Release(ctx)
+			router.OnHandleRequest(ctx)
 		})
 	}
 	var rpcClients []*rpc.Client
@@ -241,23 +249,19 @@ func runApp(appName string) {
 		serverApp := findApp(serverName)
 		if serverApp != nil {
 			c.Connect(a.Name, a.ModelName, config.Domains[serverApp.Domain]+":"+strconv.Itoa(serverApp.Rpc.Port), func(conn net.IConn, caller string, seq uint32, method string, args *rpc.Args) {
-				if r, ok := router.(interface {
-					OnRPCRequest(method string, ctx route.Context)
-				}); ok {
-					ctx := app.RpcCtxPool().Acquire().(*route.RpcContext)
-					ctx.Conn = conn
-					ctx.CallSeq = seq
-					ctx.Method = method
-					ctx.Args = args
-					ctx.Caller = caller
-					defer app.RpcCtxPool().Release(ctx)
-					r.OnRPCRequest(method, ctx)
-				}
+				ctx := thisApp.RpcCtxPool().Acquire().(*route.RpcContext)
+				ctx.Conn = conn
+				ctx.CallSeq = seq
+				ctx.Method = method
+				ctx.Args = args
+				ctx.Caller = caller
+				defer thisApp.RpcCtxPool().Release(ctx)
+				router.OnHandleRequest(ctx)
 			})
 			rpcClients = append(rpcClients, c)
 		}
 	}
-	app.AddModule(module.NewRPCModule(a.Name, rpcClients, rpcServer))
+	thisApp.AddModule(module.NewRPCModule(a.Name, rpcClients, rpcServer))
 	// service
 	services := module.Services{}
 	for _, s := range a.Services {
@@ -272,38 +276,30 @@ func runApp(appName string) {
 		switch strings.ToLower(s.Type) {
 		case "tcp":
 			serv := net.GoListen(net.Tcp, s.Port, func(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
-				if r, ok := router.(interface {
-					OnServiceRequest(net.MessageId, route.Context)
-				}); ok {
-					ctx := app.ServiceCtxPool().Acquire().(*route.ServiceContext)
-					ctx.Conn = conn
-					ctx.MessageId = msgId.MsgId()
-					ctx.MessageType = msgId.Type()
-					ctx.MessageGroup = msgId.Group()
-					ctx.MessageExtra = msgId.Extra()
-					ctx.MessageBody = &route.MessageBodyWrapper{body, c}
-					ctx.Codec = c
-					defer app.ServiceCtxPool().Release(ctx)
-					r.OnServiceRequest(msgId, ctx)
-				}
+				ctx := thisApp.ServiceCtxPool().Acquire().(*route.ServiceContext)
+				ctx.Conn = conn
+				ctx.MessageId = msgId.MsgId()
+				ctx.MessageType = msgId.Type()
+				ctx.MessageGroup = msgId.Group()
+				ctx.MessageExtra = msgId.Extra()
+				ctx.MessageBody = &route.MessageBodyWrapper{RawContent: body, Codec: c}
+				ctx.Codec = c
+				defer thisApp.ServiceCtxPool().Release(ctx)
+				router.OnHandleRequest(ctx)
 			})
 			services[s.Name] = serv
 		case "ws":
 			serv := net.GoListen(net.WebSocket, s.Port, func(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
-				if r, ok := router.(interface {
-					OnServiceRequest(net.MessageId, route.Context)
-				}); ok {
-					ctx := app.ServiceCtxPool().Acquire().(*route.ServiceContext)
-					ctx.Conn = conn
-					ctx.MessageId = msgId.MsgId()
-					ctx.MessageType = msgId.Type()
-					ctx.MessageGroup = msgId.Group()
-					ctx.MessageExtra = msgId.Extra()
-					ctx.MessageBody = &route.MessageBodyWrapper{body, c}
-					ctx.Codec = c
-					defer app.ServiceCtxPool().Release(ctx)
-					r.OnServiceRequest(msgId, ctx)
-				}
+				ctx := thisApp.ServiceCtxPool().Acquire().(*route.ServiceContext)
+				ctx.Conn = conn
+				ctx.MessageId = msgId.MsgId()
+				ctx.MessageType = msgId.Type()
+				ctx.MessageGroup = msgId.Group()
+				ctx.MessageExtra = msgId.Extra()
+				ctx.MessageBody = &route.MessageBodyWrapper{RawContent: body, Codec: c}
+				ctx.Codec = c
+				defer thisApp.ServiceCtxPool().Release(ctx)
+				router.OnHandleRequest(ctx)
 			})
 			services[s.Name] = serv
 		case "http":
@@ -311,31 +307,20 @@ func runApp(appName string) {
 				fwlogger.D("-- http service start on %s --", strconv.Itoa(s.Port))
 				if err := fasthttp.ListenAndServe(":"+strconv.Itoa(s.Port), func(req *fasthttp.RequestCtx) {
 					fwlogger.D("====> %s %s", string(req.Path()), string(req.Request.Body()))
-					if r, ok := router.(interface {
-						OnWebApiRequest(string, route.Context)
-					}); ok {
-						ctx := app.WebApiCtxPool().Acquire().(*route.WebApiContext)
-						ctx.RequestCtx = req
-						ctx.Codec = c
-						defer app.WebApiCtxPool().Release(ctx)
-						r.OnWebApiRequest(string(req.Path()), ctx)
-					}
+					ctx := thisApp.WebApiCtxPool().Acquire().(*route.WebApiContext)
+					ctx.RequestCtx = req
+					ctx.Codec = c
+					defer thisApp.WebApiCtxPool().Release(ctx)
+					router.OnHandleRequest(ctx)
 				}); err != nil {
 					fwlogger.E("-- startup http service failed! %s --", err.Error())
 				}
 			}()
 		}
 	}
-	app.AddModule(module.NewServiceModule(services))
-	// db
-	for t, c := range a.DB {
-		if t == "mongo" {
-			app.AddModule(module.NewMongoModule(app, c.Addr, c.User, c.Pwd, c.Db))
-		} else if t == "mysql" {
-			app.AddModule(module.NewMysqlModule(app, c.Addr, c.User, c.Pwd, c.Db, c.TbPrefix))
-		}
-	}
-	runningApp[a.Name] = app
+	thisApp.AddModule(module.NewServiceModule(services))
+
+	runningApp[a.Name] = thisApp
 }
 
 func stop(appName string) {

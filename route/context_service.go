@@ -44,7 +44,12 @@ func (c *ServiceContext) Ack(body interface{}) {
 		c.LogE("[ack] lost connection, app=%s ctx=%v", c.App().Name(), c.Id())
 		return
 	}
-	c.Conn.Send(net.PackId(net.MsgTypeAck, c.MessageGroup, c.MessageExtra, c.MessageId), c.Codec.Marshal(body))
+	switch body.(type) {
+	case []byte, net.MessageBody:
+		c.Conn.Send(net.PackId(net.MsgTypeAck, c.MessageGroup, c.MessageExtra, c.MessageId), body.([]byte))
+	default:
+		c.Conn.Send(net.PackId(net.MsgTypeAck, c.MessageGroup, c.MessageExtra, c.MessageId), c.Codec.Marshal(body))
+	}
 }
 
 //Note that: just send to the requester
@@ -53,7 +58,12 @@ func (c *ServiceContext) Ntf(body interface{}) {
 		c.LogE("[ntf] lost connection, app=%s ctx=%v", c.App().Name(), c.Id())
 		return
 	}
-	c.Conn.Send(net.PackId(net.MsgTypeNtf, c.MessageGroup, c.MessageExtra, c.MessageId), c.Codec.Marshal(body))
+	switch body.(type) {
+	case []byte, net.MessageBody:
+		c.Conn.Send(net.PackId(net.MsgTypeNtf, c.MessageGroup, c.MessageExtra, c.MessageId), body.([]byte))
+	default:
+		c.Conn.Send(net.PackId(net.MsgTypeNtf, c.MessageGroup, c.MessageExtra, c.MessageId), c.Codec.Marshal(body))
+	}
 }
 
 //Note that: just send to the requester
@@ -62,5 +72,10 @@ func (c *ServiceContext) Cmd(body interface{}) {
 		c.LogE("[cmd] lost connection, app=%s ctx=%v", c.App().Name(), c.Id())
 		return
 	}
-	c.Conn.Send(net.PackId(net.MsgTypeCmd, c.MessageGroup, c.MessageExtra, c.MessageId), c.Codec.Marshal(body))
+	switch body.(type) {
+	case []byte, net.MessageBody:
+		c.Conn.Send(net.PackId(net.MsgTypeCmd, c.MessageGroup, c.MessageExtra, c.MessageId), body.([]byte))
+	default:
+		c.Conn.Send(net.PackId(net.MsgTypeCmd, c.MessageGroup, c.MessageExtra, c.MessageId), c.Codec.Marshal(body))
+	}
 }

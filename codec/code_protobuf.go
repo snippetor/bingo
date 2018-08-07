@@ -33,3 +33,7 @@ func (p *protoBuf) Marshal(v interface{}) net.MessageBody {
 func (p *protoBuf) Unmarshal(data net.MessageBody, v interface{}) {
 	errors.Check(proto.Unmarshal(data, v.(proto.Message)))
 }
+
+func (j *protoBuf) Type() int {
+	return int(Protobuf)
+}

@@ -8,35 +8,35 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-type NoSqlModel interface {
-	Init(app app.Application, self NoSqlModel)
+type MongoModel interface {
+	Init(app app.Application, self MongoModel)
 	App() app.Application
 	Session() *mgo.Session
 	Sync()
 	Del()
 }
 
-type MongoModel struct {
+type BaseMongoModel struct {
 	Id   bson.ObjectId `bson:"_id"`
 	app  app.Application
-	self NoSqlModel
+	self MongoModel
 }
 
-func (m *MongoModel) Init(app app.Application, self NoSqlModel) {
+func (m *BaseMongoModel) Init(app app.Application, self MongoModel) {
 	m.app = app
 	m.self = self
 }
 
-func (m *MongoModel) App() app.Application {
+func (m *BaseMongoModel) App() app.Application {
 	return m.app
 }
 
 // must close session on transaction finish
-func (m *MongoModel) Session() *mgo.Session {
+func (m *BaseMongoModel) Session() *mgo.Session {
 	return m.App().Mongo().Session()
 }
 
-func (m *MongoModel) Sync() {
+func (m *BaseMongoModel) Sync() {
 	session := m.Session()
 	defer session.Close()
 	c := session.DB("").C(utils.StructName(m.self))
@@ -44,7 +44,7 @@ func (m *MongoModel) Sync() {
 	errors.Check(err)
 }
 
-func (m *MongoModel) Del() {
+func (m *BaseMongoModel) Del() {
 	session := m.Session()
 	defer session.Close()
 	c := session.DB("").C(utils.StructName(m.self))

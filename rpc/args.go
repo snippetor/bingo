@@ -35,6 +35,22 @@ type Args struct {
 	inner utils.ValueMap
 }
 
+func (a *Args) Put(key string, value interface{}) {
+	a.inner.Put(key, value)
+}
+
+func (a *Args) Get(key string) utils.Value {
+	return a.inner.Get(key)
+}
+
+func (a *Args) Has(key string) bool {
+	return a.inner.Has(key)
+}
+
+func (a *Args) Range(f func(k string, v utils.Value) bool) {
+	a.inner.Range(f)
+}
+
 func (a *Args) ToRPCMap(m *map[string]*RPCValue) {
 	if a.inner == nil {
 		return

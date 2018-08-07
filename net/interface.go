@@ -17,7 +17,6 @@ package net
 import (
 	errors1 "errors"
 	"github.com/snippetor/bingo/utils"
-	"github.com/snippetor/bingo/codec"
 )
 
 /**
@@ -36,7 +35,6 @@ const (
 )
 
 type MessageId int32
-type MessageBody []byte
 
 func (i MessageId) Int32() int32 {
 	return int32(i)
@@ -60,6 +58,12 @@ func (i MessageId) Extra() int32 {
 
 func (i MessageId) MsgId() int32 {
 	return i.Int32() % 100
+}
+
+type MessageBody []byte
+
+func (i MessageBody) Len() int {
+	return len(i)
 }
 
 func PackId(idType, group, extra, id int32) MessageId {

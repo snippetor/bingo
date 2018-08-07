@@ -7,8 +7,8 @@ import (
 	"github.com/snippetor/bingo/codec"
 )
 
-type OrmModel interface {
-	Init(app app.Application, self OrmModel)
+type MysqlOrmModel interface {
+	Init(app app.Application, self MysqlOrmModel)
 	App() app.Application
 	DB() *gorm.DB
 	Sync(cols ...interface{})
@@ -19,27 +19,27 @@ type OrmModel interface {
 	FieldFromString(s string, f interface{})
 }
 
-type MysqlOrmModel struct {
+type BaseMysqlOrmModel struct {
 	app  app.Application
-	self OrmModel
+	self MysqlOrmModel
 	Id   uint32 `gorm:"primary_key"`
 }
 
-func (m *MysqlOrmModel) Init(app app.Application, self OrmModel) {
+func (m *BaseMysqlOrmModel) Init(app app.Application, self MysqlOrmModel) {
 	m.app = app
 	m.self = self
 }
 
-func (m *MysqlOrmModel) App() app.Application {
+func (m *BaseMysqlOrmModel) App() app.Application {
 	return m.app
 }
 
-func (m *MysqlOrmModel) DB() *gorm.DB {
+func (m *BaseMysqlOrmModel) DB() *gorm.DB {
 	return m.App().MySql().DB()
 }
 
 // 更新到数据库
-func (m *MysqlOrmModel) Sync(cols ...interface{}) {
+func (m *BaseMysqlOrmModel) Sync(cols ...interface{}) {
 	if cols != nil && len(cols) > 0 {
 		errors.Check(m.DB().Model(m.self).UpdateColumn(cols).Error)
 	} else {
@@ -48,7 +48,7 @@ func (m *MysqlOrmModel) Sync(cols ...interface{}) {
 }
 
 // 更新到数据库
-func (m *MysqlOrmModel) SyncInTx(tx *gorm.DB, cols ...interface{}) {
+func (m *BaseMysqlOrmModel) SyncInTx(tx *gorm.DB, cols ...interface{}) {
 	if cols != nil && len(cols) > 0 {
 		errors.Check(tx.Model(m.self).UpdateColumn(cols).Error)
 	} else {
@@ -57,19 +57,19 @@ func (m *MysqlOrmModel) SyncInTx(tx *gorm.DB, cols ...interface{}) {
 }
 
 // 从数据库移除，ID必须存在
-func (m *MysqlOrmModel) Del() {
+func (m *BaseMysqlOrmModel) Del() {
 	errors.Check(m.DB().Delete(m.self).Error)
 }
 
 // 从数据库移除，ID必须存在
-func (m *MysqlOrmModel) DelInTx(tx *gorm.DB) {
+func (m *BaseMysqlOrmModel) DelInTx(tx *gorm.DB) {
 	errors.Check(tx.Delete(m.self).Error)
 }
 
-func (m *MysqlOrmModel) FieldToString(f interface{}) string {
+func (m *BaseMysqlOrmModel) FieldToString(f interface{}) string {
 	return string(codec.JsonCodec.Marshal(f))
 }
 
-func (m *MysqlOrmModel) FieldFromString(s string, f interface{}) {
+func (m *BaseMysqlOrmModel) FieldFromString(s string, f interface{}) {
 	codec.JsonCodec.Unmarshal([]byte(s), f)
 }

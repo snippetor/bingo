@@ -33,7 +33,7 @@ func (c *WebApiContext) ResponseOK(body interface{}) {
 	c.RequestCtx.Response.SetStatusCode(fasthttp.StatusOK)
 	bs := c.Codec.Marshal(body)
 	c.RequestCtx.Response.SetBody(bs)
-	c.LogD("<==== %s %s", string(c.RequestCtx.Path()), string(bs))
+	c.LogD("<<< %s %s", string(c.RequestCtx.Path()), string(bs))
 }
 
 func (c *WebApiContext) ResponseFailed(reason string) {
@@ -42,5 +42,5 @@ func (c *WebApiContext) ResponseFailed(reason string) {
 	params["error"] = reason
 	bs := c.Codec.Marshal(params)
 	c.RequestCtx.Response.SetBody(bs)
-	c.LogD("<==== %s %s", string(c.RequestCtx.Path()), string(bs))
+	c.LogD("<<< %s %s", string(c.RequestCtx.Path()), string(bs))
 }

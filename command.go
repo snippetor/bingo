@@ -26,7 +26,6 @@ import (
 	"github.com/snippetor/bingo/utils"
 	"github.com/snippetor/bingo/log"
 	"github.com/snippetor/bingo/module"
-	"github.com/snippetor/bingo/route"
 	"github.com/snippetor/bingo/app"
 	"github.com/snippetor/bingo/mvc"
 	"github.com/snippetor/bingo/codec"
@@ -87,14 +86,14 @@ type StartUpFunc func(app.Application) []interface{}
 
 var (
 	config      *Config
-	router      route.Router
+	router      app.Router
 	runningApp  = make(map[string]app.Application)
 	startUpFunc = make(map[string]StartUpFunc)
 )
 
 func init() {
 	config = &Config{}
-	router = route.NewRouter()
+	router = app.NewRouter()
 }
 
 func RegisterApp(appName string, startupFunc StartUpFunc) {
@@ -146,9 +145,9 @@ func runApp(appName string) {
 	// db
 	for t, c := range a.DB {
 		if t == "mongo" {
-			thisApp.AddModule(module.NewMongoModule(thisApp, c.Addr, c.User, c.Pwd, c.Db))
+			thisApp.AddModule(module.NewMongoModule(c.Addr, c.User, c.Pwd, c.Db))
 		} else if t == "mysql" {
-			thisApp.AddModule(module.NewMysqlModule(thisApp, c.Addr, c.User, c.Pwd, c.Db, c.TbPrefix))
+			thisApp.AddModule(module.NewMysqlModule(c.Addr, c.User, c.Pwd, c.Db, c.TbPrefix))
 		}
 	}
 	// init mvc objects
@@ -157,7 +156,7 @@ func runApp(appName string) {
 		if objs != nil {
 			for _, obj := range objs {
 				if mvc.IsController(obj) {
-					builder := route.NewRouterBuild(router, obj)
+					builder := app.NewRouterBuild(router, obj)
 					obj.(mvc.Controller).Route(builder)
 					builder.Build()
 				} else if mvc.IsOrmModel(obj) {
@@ -233,7 +232,7 @@ func runApp(appName string) {
 	if a.Rpc.Port > 0 {
 		rpcServer = &rpc.Server{}
 		rpcServer.Listen(a.Name, a.ModelName, a.Rpc.Port, func(conn net.IConn, caller string, seq uint32, method string, args *rpc.Args) {
-			ctx := thisApp.RpcCtxPool().Acquire().(*route.RpcContext)
+			ctx := thisApp.RpcCtxPool().Acquire().(*app.RpcContext)
 			ctx.Conn = conn
 			ctx.CallSeq = seq
 			ctx.Method = method
@@ -249,7 +248,7 @@ func runApp(appName string) {
 		serverApp := findApp(serverName)
 		if serverApp != nil {
 			c.Connect(a.Name, a.ModelName, config.Domains[serverApp.Domain]+":"+strconv.Itoa(serverApp.Rpc.Port), func(conn net.IConn, caller string, seq uint32, method string, args *rpc.Args) {
-				ctx := thisApp.RpcCtxPool().Acquire().(*route.RpcContext)
+				ctx := thisApp.RpcCtxPool().Acquire().(*app.RpcContext)
 				ctx.Conn = conn
 				ctx.CallSeq = seq
 				ctx.Method = method
@@ -276,13 +275,13 @@ func runApp(appName string) {
 		switch strings.ToLower(s.Type) {
 		case "tcp":
 			serv := net.GoListen(net.Tcp, s.Port, func(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
-				ctx := thisApp.ServiceCtxPool().Acquire().(*route.ServiceContext)
+				ctx := thisApp.ServiceCtxPool().Acquire().(*app.ServiceContext)
 				ctx.Conn = conn
 				ctx.MessageId = msgId.MsgId()
 				ctx.MessageType = msgId.Type()
 				ctx.MessageGroup = msgId.Group()
 				ctx.MessageExtra = msgId.Extra()
-				ctx.MessageBody = &route.MessageBodyWrapper{RawContent: body, Codec: c}
+				ctx.MessageBody = &app.MessageBodyWrapper{RawContent: body, Codec: c}
 				ctx.Codec = c
 				defer thisApp.ServiceCtxPool().Release(ctx)
 				router.OnHandleRequest(ctx)
@@ -290,13 +289,13 @@ func runApp(appName string) {
 			services[s.Name] = serv
 		case "ws":
 			serv := net.GoListen(net.WebSocket, s.Port, func(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
-				ctx := thisApp.ServiceCtxPool().Acquire().(*route.ServiceContext)
+				ctx := thisApp.ServiceCtxPool().Acquire().(*app.ServiceContext)
 				ctx.Conn = conn
 				ctx.MessageId = msgId.MsgId()
 				ctx.MessageType = msgId.Type()
 				ctx.MessageGroup = msgId.Group()
 				ctx.MessageExtra = msgId.Extra()
-				ctx.MessageBody = &route.MessageBodyWrapper{RawContent: body, Codec: c}
+				ctx.MessageBody = &app.MessageBodyWrapper{RawContent: body, Codec: c}
 				ctx.Codec = c
 				defer thisApp.ServiceCtxPool().Release(ctx)
 				router.OnHandleRequest(ctx)
@@ -307,7 +306,7 @@ func runApp(appName string) {
 				fwlogger.D("-- http service start on %s --", strconv.Itoa(s.Port))
 				if err := fasthttp.ListenAndServe(":"+strconv.Itoa(s.Port), func(req *fasthttp.RequestCtx) {
 					fwlogger.D("====> %s %s", string(req.Path()), string(req.Request.Body()))
-					ctx := thisApp.WebApiCtxPool().Acquire().(*route.WebApiContext)
+					ctx := thisApp.WebApiCtxPool().Acquire().(*app.WebApiContext)
 					ctx.RequestCtx = req
 					ctx.Codec = c
 					defer thisApp.WebApiCtxPool().Release(ctx)

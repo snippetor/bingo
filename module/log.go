@@ -2,13 +2,13 @@ package module
 
 import "github.com/snippetor/bingo/log"
 
+type Loggers map[string]log.Logger
+
 // log module
 type LogModule interface {
 	Module
 	GetLogger(name string) log.Logger
 }
-
-type Loggers map[string]log.Logger
 
 type logModule struct {
 	loggers Loggers

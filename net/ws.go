@@ -20,7 +20,6 @@ import (
 	"strconv"
 	"github.com/snippetor/bingo/comm"
 	"sync"
-	"github.com/snippetor/bingo/utils"
 	"github.com/snippetor/bingo/log/fwlogger"
 )
 
@@ -73,7 +72,7 @@ type wsServer struct {
 	sync.RWMutex
 	upgrader *websocket.Upgrader
 	callback IMessageCallback
-	clients  map[utils.Identity]IConn
+	clients  map[uint32]IConn
 }
 
 func (s *wsServer) wsHttpHandle(w http.ResponseWriter, r *http.Request) {
@@ -95,7 +94,7 @@ func (s *wsServer) listen(port int, callback IMessageCallback) bool {
 		s.upgrader = &websocket.Upgrader{}
 	}
 	s.callback = callback
-	s.clients = make(map[utils.Identity]IConn, 0)
+	s.clients = make(map[uint32]IConn, 0)
 	http.HandleFunc("/", s.wsHttpHandle)
 	if err := http.ListenAndServe("localhost:"+strconv.Itoa(port), nil); err != nil {
 		fwlogger.E(err.Error())
@@ -129,7 +128,7 @@ func (s *wsServer) handleConnection(conn IConn, callback IMessageCallback) {
 	}
 }
 
-func (s *wsServer) GetConnection(identity utils.Identity) (IConn, bool) {
+func (s *wsServer) GetConnection(identity uint32) (IConn, bool) {
 	s.RLock()
 	defer s.RUnlock()
 	if s.clients == nil {

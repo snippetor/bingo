@@ -1,10 +1,5 @@
 package errors
 
-import (
-	"github.com/snippetor/bingo/log"
-	"runtime/debug"
-)
-
 func Check(err error) bool {
 	if err != nil {
 		panic(err)

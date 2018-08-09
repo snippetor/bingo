@@ -3,19 +3,18 @@ package module
 import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
-	"github.com/snippetor/bingo/app"
 	"github.com/snippetor/bingo/errors"
-	"github.com/snippetor/bingo/mvc"
 )
 
+// mysql
 type MySqlModule interface {
 	Module
 	DB() *gorm.DB
 	TableName(tbName string) string
-	AutoMigrate(model mvc.MysqlOrmModel)
+	AutoMigrate(model interface{})
 
-	Create(model mvc.MysqlOrmModel) bool
-	Find(model mvc.MysqlOrmModel) bool
+	Create(model interface{}) bool
+	Find(model interface{}) bool
 	FindAll(models interface{}) bool
 	FindMany(models interface{}, limit int, orderBy string, whereAndArgs ... interface{}) bool
 	Begin() *gorm.DB
@@ -24,13 +23,12 @@ type MySqlModule interface {
 }
 
 type mysqlModule struct {
-	app      app.Application
 	db       *gorm.DB
 	tbPrefix string
 }
 
-func NewMysqlModule(app app.Application, addr, username, pwd, defaultDb, tbPrefix string) MySqlModule {
-	m := &mysqlModule{app: app, tbPrefix: tbPrefix}
+func NewMysqlModule(addr, username, pwd, defaultDb, tbPrefix string) MySqlModule {
+	m := &mysqlModule{tbPrefix: tbPrefix}
 	m.dial(addr, username, pwd, defaultDb)
 	return m
 }
@@ -60,13 +58,21 @@ func (m *mysqlModule) TableName(tbName string) string {
 	return tbName
 }
 
-func (m *mysqlModule) AutoMigrate(model mvc.MysqlOrmModel) {
-	model.Init(m.app, model)
+func (m *mysqlModule) AutoMigrate(model interface{}) {
+	if mod, ok := model.(interface {
+		Init(*gorm.DB, interface{})
+	}); ok {
+		mod.Init(m.db, model)
+	}
 	m.DB().AutoMigrate(model)
 }
 
-func (m *mysqlModule) Create(model mvc.MysqlOrmModel) bool {
-	model.Init(m.app, model)
+func (m *mysqlModule) Create(model interface{}) bool {
+	if mod, ok := model.(interface {
+		Init(*gorm.DB, interface{})
+	}); ok {
+		mod.Init(m.db, model)
+	}
 	res := m.DB().Create(model)
 	if res.Error != nil {
 		panic(res.Error)
@@ -74,8 +80,12 @@ func (m *mysqlModule) Create(model mvc.MysqlOrmModel) bool {
 	return true
 }
 
-func (m *mysqlModule) Find(model mvc.MysqlOrmModel) bool {
-	model.Init(m.app, model)
+func (m *mysqlModule) Find(model interface{}) bool {
+	if mod, ok := model.(interface {
+		Init(*gorm.DB, interface{})
+	}); ok {
+		mod.Init(m.db, model)
+	}
 	res := m.DB().Where(model).First(model)
 	return res.Error == nil
 }

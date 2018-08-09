@@ -1,8 +1,7 @@
-package route
+package app
 
 import (
 	"sync/atomic"
-	"github.com/snippetor/bingo/app"
 	"fmt"
 )
 
@@ -126,7 +125,7 @@ type Context interface {
 	// means that the StopExecution() was called.
 	IsStopped() bool
 
-	App() app.Application
+	App() Application
 
 	LogE(format string, v ...interface{})
 	LogD(format string, v ...interface{})
@@ -156,7 +155,7 @@ type context struct {
 	// the current route's name registered to this request path.
 	currentRouteName string
 
-	app app.Application
+	app Application
 
 	// the route's handlers
 	handlers Handlers
@@ -169,7 +168,7 @@ type context struct {
 // to a custom one.
 //
 // This context is received by the context pool.
-func NewContext(app app.Application) Context {
+func NewContext(app Application) Context {
 	return &context{app: app}
 }
 
@@ -413,7 +412,7 @@ func (ctx *context) IsStopped() bool {
 	return ctx.currentHandlerIndex == stopExecutionIndex
 }
 
-func (ctx *context) App() app.Application {
+func (ctx *context) App() Application {
 	return ctx.app
 }
 

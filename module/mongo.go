@@ -6,9 +6,9 @@ import (
 	"time"
 	"gopkg.in/mgo.v2/bson"
 	"github.com/snippetor/bingo/utils"
-	"github.com/snippetor/bingo/app"
 )
 
+// mongo
 type MongoModule interface {
 	Module
 	Session() *mgo.Session
@@ -20,12 +20,11 @@ type MongoModule interface {
 }
 
 type mongoModule struct {
-	app     app.Application
 	session *mgo.Session
 }
 
-func NewMongoModule(app app.Application, addr, username, pwd, defaultDb string) MongoModule {
-	m := &mongoModule{app: app}
+func NewMongoModule(addr, username, pwd, defaultDb string) MongoModule {
+	m := &mongoModule{}
 	m.dial(addr, username, pwd, defaultDb)
 	return m
 }

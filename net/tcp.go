@@ -19,7 +19,6 @@ import (
 	"strconv"
 	"github.com/snippetor/bingo/comm"
 	"sync"
-	"github.com/snippetor/bingo/utils"
 	"github.com/snippetor/bingo/log/fwlogger"
 )
 
@@ -67,7 +66,7 @@ type tcpServer struct {
 	comm.Configable
 	sync.RWMutex
 	listener *net.TCPListener
-	clients  map[utils.Identity]IConn
+	clients  map[uint32]IConn
 }
 
 func (s *tcpServer) listen(port int, callback IMessageCallback) bool {
@@ -83,7 +82,7 @@ func (s *tcpServer) listen(port int, callback IMessageCallback) bool {
 	}
 	defer listener.Close()
 	s.listener = listener
-	s.clients = make(map[utils.Identity]IConn, 0)
+	s.clients = make(map[uint32]IConn, 0)
 	fwlogger.I("Tcp server runnning on :%d", port)
 	for {
 		conn, err := listener.AcceptTCP()
@@ -132,7 +131,7 @@ func (s *tcpServer) handleConnection(conn IConn, callback IMessageCallback) {
 	}
 }
 
-func (s *tcpServer) GetConnection(identity utils.Identity) (IConn, bool) {
+func (s *tcpServer) GetConnection(identity uint32) (IConn, bool) {
 	s.RLock()
 	defer s.RUnlock()
 	if s.clients == nil {

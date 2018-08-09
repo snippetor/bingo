@@ -3,20 +3,20 @@ package recover
 import (
 	"fmt"
 	"runtime"
-	"github.com/snippetor/bingo/route"
 	"reflect"
+	"github.com/snippetor/bingo/app"
 )
 
-func getRequestLogs(ctx route.Context) string {
+func getRequestLogs(ctx app.Context) string {
 	switch ctx.(type) {
-	case *route.RpcContext:
-		c := ctx.(*route.RpcContext)
+	case *app.RpcContext:
+		c := ctx.(*app.RpcContext)
 		return fmt.Sprintf("[RPC] '%s' call '%s' method %s#%v args=%v", c.Caller, c.App().Name(), c.Method, c.CallSeq, c.Args)
-	case *route.ServiceContext:
-		c := ctx.(*route.ServiceContext)
+	case *app.ServiceContext:
+		c := ctx.(*app.ServiceContext)
 		return fmt.Sprintf("[SOC] '%s' %v %v %v %v, %v", c.App().Name(), c.MessageType, c.MessageGroup, c.MessageExtra, c.MessageId, c.MessageBody.RawContent)
-	case *route.WebApiContext:
-		c := ctx.(*route.WebApiContext)
+	case *app.WebApiContext:
+		c := ctx.(*app.WebApiContext)
 		return fmt.Sprintf("[API] '%s' %s %s %s", c.App().Name(), string(c.RequestCtx.Path()), string(c.RequestCtx.Method()), c.RequestCtx.RemoteIP().String())
 	default:
 		return fmt.Sprintf("[UFO] unknown ctx type %v", reflect.TypeOf(ctx))
@@ -26,8 +26,8 @@ func getRequestLogs(ctx route.Context) string {
 // New returns a new recover middleware,
 // it recovers from panics and logs
 // the panic message to the application's logger "Warn" level.
-func New() route.Handler {
-	return func(ctx route.Context) {
+func New() app.Handler {
+	return func(ctx app.Context) {
 		defer func() {
 			if err := recover(); err != nil {
 				if ctx.IsStopped() {
@@ -52,14 +52,14 @@ func New() route.Handler {
 				logMessage += fmt.Sprintf("\n%s", stacktrace)
 				ctx.LogE(logMessage)
 				switch ctx.(type) {
-				case *route.RpcContext:
-					c := ctx.(*route.RpcContext)
+				case *app.RpcContext:
+					c := ctx.(*app.RpcContext)
 					c.ReturnNil()
-					//case *route.ServiceContext:
-					//c := ctx.(*route.ServiceContext)
+					//case *app.ServiceContext:
+					//c := ctx.(*app.ServiceContext)
 					//c.Ack(map[string]interface{}{"code": -1, "desc": fmt.Sprintf("%s", err)})
-				case *route.WebApiContext:
-					c := ctx.(*route.WebApiContext)
+				case *app.WebApiContext:
+					c := ctx.(*app.WebApiContext)
 					c.ResponseFailed(fmt.Sprintf("%s", err))
 				}
 				ctx.StopExecution()

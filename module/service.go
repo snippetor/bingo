@@ -2,13 +2,13 @@ package module
 
 import "github.com/snippetor/bingo/net"
 
+type Services map[string]net.IServer
+
 // service
 type ServiceModule interface {
 	Module
 	GetService(name string) (net.IServer, bool)
 }
-
-type Services map[string]net.IServer
 
 type serviceModule struct {
 	servers Services

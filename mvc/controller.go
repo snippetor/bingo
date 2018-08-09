@@ -1,7 +1,7 @@
 package mvc
 
-import "github.com/snippetor/bingo/route"
+import "github.com/snippetor/bingo/app"
 
 type Controller interface {
-	Route(builder route.RouterBuilder)
+	Route(builder app.RouterBuilder)
 }

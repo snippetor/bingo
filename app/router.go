@@ -1,4 +1,4 @@
-package route
+package app
 
 import (
 	"fmt"
@@ -91,7 +91,7 @@ func (r *router) OnHandleRequest(ctx Context) {
 			ctx.Do(newHandlers)
 		}
 	case *ServiceContext:
-		c := ctx.(ServiceContext)
+		c := ctx.(*ServiceContext)
 		if c.MessageType != net.MsgTypeReq {
 			c.LogE("Ignore service message type=%d, group=%d, extra=%d id=%d", c.MessageType, c.MessageBody, c.MessageExtra, c.MessageId)
 			return

@@ -16,9 +16,8 @@ package app
 
 import (
 	"github.com/snippetor/bingo/utils"
-	"github.com/snippetor/bingo/module"
 	"reflect"
-	"github.com/snippetor/bingo/route"
+	"github.com/snippetor/bingo/module"
 )
 
 type Application interface {
@@ -35,12 +34,12 @@ type Application interface {
 	Config() utils.ValueMap
 
 	// 使用中间件，中间件将在其他Handler之前执行
-	Use(middleware ...route.Handler)
-	GlobalMiddleWares() route.Handlers
+	Use(middleware ...Handler)
+	GlobalMiddleWares() Handlers
 
-	RpcCtxPool() *route.Pool
-	ServiceCtxPool() *route.Pool
-	WebApiCtxPool() *route.Pool
+	RpcCtxPool() *Pool
+	ServiceCtxPool() *Pool
+	WebApiCtxPool() *Pool
 }
 
 var _ Application = (*application)(nil)
@@ -51,11 +50,11 @@ type application struct {
 	config  utils.ValueMap
 	modules map[string]module.Module
 
-	rpcCtxPool     *route.Pool
-	serviceCtxPool *route.Pool
-	webApiCtxPool  *route.Pool
+	rpcCtxPool     *Pool
+	serviceCtxPool *Pool
+	webApiCtxPool  *Pool
 
-	globalMiddleWares route.Handlers
+	globalMiddleWares Handlers
 }
 
 func New(name string, config utils.ValueMap) Application {
@@ -64,19 +63,19 @@ func New(name string, config utils.ValueMap) Application {
 		config:  config,
 		modules: make(map[string]module.Module),
 	}
-	a.rpcCtxPool = route.NewPool(func() route.Context {
-		return &route.RpcContext{
-			Context: route.NewContext(a),
+	a.rpcCtxPool = NewPool(func() Context {
+		return &RpcContext{
+			Context: NewContext(a),
 		}
 	})
-	a.serviceCtxPool = route.NewPool(func() route.Context {
-		return &route.ServiceContext{
-			Context: route.NewContext(a),
+	a.serviceCtxPool = NewPool(func() Context {
+		return &ServiceContext{
+			Context: NewContext(a),
 		}
 	})
-	a.webApiCtxPool = route.NewPool(func() route.Context {
-		return &route.WebApiContext{
-			Context: route.NewContext(a),
+	a.webApiCtxPool = NewPool(func() Context {
+		return &WebApiContext{
+			Context: NewContext(a),
 		}
 	})
 	return a
@@ -97,18 +96,18 @@ func (a *application) GetModule(module module.Module) module.Module {
 	return nil
 }
 
-func (a *application) Use(middleware ...route.Handler) {
+func (a *application) Use(middleware ...Handler) {
 	a.globalMiddleWares = append(a.globalMiddleWares, middleware...)
 }
 
-func (a *application) GlobalMiddleWares() route.Handlers {
-	clone := make(route.Handlers, len(a.globalMiddleWares))
+func (a *application) GlobalMiddleWares() Handlers {
+	clone := make(Handlers, len(a.globalMiddleWares))
 	copy(clone, a.globalMiddleWares)
 	return clone
 }
 
 func (a *application) RPC() module.RPCModule {
-	m, ok := a.modules["*module.RPCModule"]
+	m, ok := a.modules["*RPCModule"]
 	if ok {
 		return m.(module.RPCModule)
 	}
@@ -116,7 +115,7 @@ func (a *application) RPC() module.RPCModule {
 }
 
 func (a *application) Service() module.ServiceModule {
-	m, ok := a.modules["*module.ServiceModule"]
+	m, ok := a.modules["*ServiceModule"]
 	if ok {
 		return m.(module.ServiceModule)
 	}
@@ -124,7 +123,7 @@ func (a *application) Service() module.ServiceModule {
 }
 
 func (a *application) Log() module.LogModule {
-	m, ok := a.modules["*module.LogModule"]
+	m, ok := a.modules["*LogModule"]
 	if ok {
 		return m.(module.LogModule)
 	}
@@ -132,7 +131,7 @@ func (a *application) Log() module.LogModule {
 }
 
 func (a *application) MySql() module.MySqlModule {
-	m, ok := a.modules["*module.MySqlModule"]
+	m, ok := a.modules["*MySqlModule"]
 	if ok {
 		return m.(module.MySqlModule)
 	}
@@ -140,7 +139,7 @@ func (a *application) MySql() module.MySqlModule {
 }
 
 func (a *application) Mongo() module.MongoModule {
-	m, ok := a.modules["*module.MongoModule"]
+	m, ok := a.modules["*MongoModule"]
 	if ok {
 		return m.(module.MongoModule)
 	}
@@ -151,15 +150,15 @@ func (a *application) Config() utils.ValueMap {
 	return a.config
 }
 
-func (a *application) RpcCtxPool() *route.Pool {
+func (a *application) RpcCtxPool() *Pool {
 	return a.rpcCtxPool
 }
 
-func (a *application) ServiceCtxPool() *route.Pool {
+func (a *application) ServiceCtxPool() *Pool {
 	return a.serviceCtxPool
 }
 
-func (a *application) WebApiCtxPool() *route.Pool {
+func (a *application) WebApiCtxPool() *Pool {
 	return a.webApiCtxPool
 }
 

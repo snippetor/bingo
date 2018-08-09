@@ -3,7 +3,7 @@ package latency
 import (
 	"time"
 	"fmt"
-	"github.com/snippetor/bingo/route"
+	"github.com/snippetor/bingo/app"
 )
 
 // New creates and returns test.go new request logger middleware.
@@ -11,8 +11,8 @@ import (
 // This is for the http requests.
 //
 // Receives an optional configuation.
-func New() route.Handler {
-	return func(ctx route.Context) {
+func New() app.Handler {
+	return func(ctx app.Context) {
 		//all except latency to string
 		var latency time.Duration
 		var startTime, endTime time.Time

@@ -1,15 +1,13 @@
 package mvc
 
 import (
-	"github.com/snippetor/bingo/app"
 	"github.com/jinzhu/gorm"
 	"github.com/snippetor/bingo/errors"
 	"github.com/snippetor/bingo/codec"
 )
 
 type MysqlOrmModel interface {
-	Init(app app.Application, self MysqlOrmModel)
-	App() app.Application
+	Init(db *gorm.DB, self interface{})
 	DB() *gorm.DB
 	Sync(cols ...interface{})
 	SyncInTx(tx *gorm.DB, cols ...interface{})
@@ -20,22 +18,18 @@ type MysqlOrmModel interface {
 }
 
 type BaseMysqlOrmModel struct {
-	app  app.Application
-	self MysqlOrmModel
+	db   *gorm.DB
+	self interface{}
 	Id   uint32 `gorm:"primary_key"`
 }
 
-func (m *BaseMysqlOrmModel) Init(app app.Application, self MysqlOrmModel) {
-	m.app = app
+func (m *BaseMysqlOrmModel) Init(db *gorm.DB, self interface{}) {
+	m.db = db
 	m.self = self
 }
 
-func (m *BaseMysqlOrmModel) App() app.Application {
-	return m.app
-}
-
 func (m *BaseMysqlOrmModel) DB() *gorm.DB {
-	return m.App().MySql().DB()
+	return m.db
 }
 
 // 更新到数据库

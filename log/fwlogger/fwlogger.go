@@ -20,7 +20,7 @@ import (
 
 var (
 	// bingo框架日志
-	fwLogger *log.Logger
+	fwLogger log.Logger
 )
 
 func init() {

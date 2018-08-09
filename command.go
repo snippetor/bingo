@@ -233,12 +233,12 @@ func runApp(appName string) {
 		rpcServer = &rpc.Server{}
 		rpcServer.Listen(a.Name, a.ModelName, a.Rpc.Port, func(conn net.IConn, caller string, seq uint32, method string, args *rpc.Args) {
 			ctx := thisApp.RpcCtxPool().Acquire().(*app.RpcContext)
+			defer thisApp.RpcCtxPool().Release(ctx)
 			ctx.Conn = conn
 			ctx.CallSeq = seq
 			ctx.Method = method
 			ctx.Args = args
 			ctx.Caller = caller
-			defer thisApp.RpcCtxPool().Release(ctx)
 			router.OnHandleRequest(ctx)
 		})
 	}
@@ -249,12 +249,12 @@ func runApp(appName string) {
 		if serverApp != nil {
 			c.Connect(a.Name, a.ModelName, config.Domains[serverApp.Domain]+":"+strconv.Itoa(serverApp.Rpc.Port), func(conn net.IConn, caller string, seq uint32, method string, args *rpc.Args) {
 				ctx := thisApp.RpcCtxPool().Acquire().(*app.RpcContext)
+				defer thisApp.RpcCtxPool().Release(ctx)
 				ctx.Conn = conn
 				ctx.CallSeq = seq
 				ctx.Method = method
 				ctx.Args = args
 				ctx.Caller = caller
-				defer thisApp.RpcCtxPool().Release(ctx)
 				router.OnHandleRequest(ctx)
 			})
 			rpcClients = append(rpcClients, c)
@@ -276,6 +276,7 @@ func runApp(appName string) {
 		case "tcp":
 			serv := net.GoListen(net.Tcp, s.Port, func(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
 				ctx := thisApp.ServiceCtxPool().Acquire().(*app.ServiceContext)
+				defer thisApp.ServiceCtxPool().Release(ctx)
 				ctx.Conn = conn
 				ctx.MessageId = msgId.MsgId()
 				ctx.MessageType = msgId.Type()
@@ -283,13 +284,13 @@ func runApp(appName string) {
 				ctx.MessageExtra = msgId.Extra()
 				ctx.MessageBody = &app.MessageBodyWrapper{RawContent: body, Codec: c}
 				ctx.Codec = c
-				defer thisApp.ServiceCtxPool().Release(ctx)
 				router.OnHandleRequest(ctx)
 			})
 			services[s.Name] = serv
 		case "ws":
 			serv := net.GoListen(net.WebSocket, s.Port, func(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
 				ctx := thisApp.ServiceCtxPool().Acquire().(*app.ServiceContext)
+				defer thisApp.ServiceCtxPool().Release(ctx)
 				ctx.Conn = conn
 				ctx.MessageId = msgId.MsgId()
 				ctx.MessageType = msgId.Type()
@@ -297,7 +298,6 @@ func runApp(appName string) {
 				ctx.MessageExtra = msgId.Extra()
 				ctx.MessageBody = &app.MessageBodyWrapper{RawContent: body, Codec: c}
 				ctx.Codec = c
-				defer thisApp.ServiceCtxPool().Release(ctx)
 				router.OnHandleRequest(ctx)
 			})
 			services[s.Name] = serv
@@ -307,9 +307,9 @@ func runApp(appName string) {
 				if err := fasthttp.ListenAndServe(":"+strconv.Itoa(s.Port), func(req *fasthttp.RequestCtx) {
 					fwlogger.D("====> %s %s", string(req.Path()), string(req.Request.Body()))
 					ctx := thisApp.WebApiCtxPool().Acquire().(*app.WebApiContext)
+					defer thisApp.WebApiCtxPool().Release(ctx)
 					ctx.RequestCtx = req
 					ctx.Codec = c
-					defer thisApp.WebApiCtxPool().Release(ctx)
 					router.OnHandleRequest(ctx)
 				}); err != nil {
 					fwlogger.E("-- startup http service failed! %s --", err.Error())

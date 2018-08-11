@@ -16,7 +16,6 @@ package app
 
 import (
 	"github.com/snippetor/bingo/net"
-	"github.com/snippetor/bingo/log/fwlogger"
 	"github.com/snippetor/bingo/rpc"
 )
 
@@ -48,13 +47,13 @@ func (c *RpcContext) Return(r *rpc.Args) {
 	r.ToRPCMap(&res)
 	body := rpc.DefaultCodec.Marshal(&rpc.RPCMethodReturn{CallSeq: c.CallSeq, Method: c.Method, Returns: res})
 	if !c.Conn.Send(net.MessageId(rpc.RPC_MSGID_RETURN), body) {
-		fwlogger.E("-- return rpc method %s failed! send message failed --", c.Method)
+		c.LogE("-- return rpc method %s failed! send message failed --", c.Method)
 	}
 }
 
 func (c *RpcContext) ReturnNil() {
 	body := rpc.DefaultCodec.Marshal(&rpc.RPCMethodReturn{CallSeq: c.CallSeq, Method: c.Method, Returns: nil})
 	if !c.Conn.Send(net.MessageId(rpc.RPC_MSGID_RETURN), body) {
-		fwlogger.E("-- return rpc method %s failed! send message failed --", c.Method)
+		c.LogE("-- return rpc method %s failed! send message failed --", c.Method)
 	}
 }

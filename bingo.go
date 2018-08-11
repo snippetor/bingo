@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"github.com/snippetor/bingo/log"
 	"github.com/snippetor/bingo/log/fwlogger"
+	"github.com/snippetor/bingo/app"
 )
 
 var (

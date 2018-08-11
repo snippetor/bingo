@@ -82,13 +82,13 @@ type Config struct {
 	Apps    []*AppConfig `json:"apps"`
 }
 
-type StartUpFunc func(app.Application) []interface{}
+type AppStartUpFunc func(app.Application) []interface{}
 
 var (
 	config      *Config
 	router      app.Router
 	runningApp  = make(map[string]app.Application)
-	startUpFunc = make(map[string]StartUpFunc)
+	startUpFunc = make(map[string]AppStartUpFunc)
 )
 
 func init() {
@@ -96,7 +96,7 @@ func init() {
 	router = app.NewRouter()
 }
 
-func RegisterApp(appName string, startupFunc StartUpFunc) {
+func RegisterApp(appName string, startupFunc AppStartUpFunc) {
 	startUpFunc[appName] = startupFunc
 }
 

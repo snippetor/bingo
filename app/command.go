@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package bingo
+package app
 
 import (
 	"io/ioutil"
@@ -31,6 +31,11 @@ import (
 	"github.com/snippetor/bingo/codec"
 	"github.com/snippetor/bingo/middleware/recover"
 	"github.com/snippetor/bingo/middleware/latency"
+	"flag"
+	"fmt"
+	"runtime"
+	"path/filepath"
+	"os"
 )
 
 type Service struct {
@@ -98,6 +103,70 @@ func init() {
 
 func RegisterApp(appName string, startupFunc AppStartUpFunc) {
 	startUpFunc[appName] = startupFunc
+}
+
+func Version() string {
+	return "v0.1"
+}
+
+func SetLogLevel(level log.Level) {
+	fwlogger.SetLevel(level)
+}
+
+func Run() {
+	//flag.Parse()
+	//
+	//c := *c
+	//d := *d
+	//n := *n
+	//proc := *proc
+	//help := *help
+	//version := *version
+	//
+	//if help {
+	//	fmt.Println(usage)
+	//	return
+	//}
+	//if version {
+	//	fmt.Println("Bingo version: " + Version())
+	//	return
+	//}
+	//
+	//if c == "" {
+	//	fmt.Println("config file must be set")
+	//	fmt.Println(usage)
+	//	return
+	//}
+	//
+	//if proc == -1 {
+	//	runtime.GOMAXPROCS(runtime.NumCPU())
+	//} else {
+	//	runtime.GOMAXPROCS(proc)
+	//}
+
+	//if filepath.IsAbs(c) {
+	//	parse(c)
+	//} else {
+	//	if dir, err := os.Getwd(); err == nil {
+	//		parse(filepath.Join(dir, c))
+	//	}
+	//}
+	//
+	//if d {
+	//	//TODO
+	//} else {
+	//	if n == "" {
+	//		runAll()
+	//	} else {
+	//		runApp(n)
+	//	}
+	//}
+	//
+	//select {
+	//case <-endRunning:
+	//	stopAll()
+	//}
+	//<-endRunning
 }
 
 func AppConfigs() []*AppConfig {
@@ -322,6 +391,12 @@ func runApp(appName string) {
 	runningApp[a.Name] = thisApp
 }
 
+func runAll() {
+	for _, n := range config.Apps {
+		runApp(n.Name)
+	}
+}
+
 func stop(appName string) {
 	n := findApp(appName)
 	if n == nil {
@@ -337,12 +412,6 @@ func stop(appName string) {
 	}
 }
 
-func runAll() {
-	for _, n := range config.Apps {
-		runApp(n.Name)
-	}
-}
-
 func stopAll() {
 	for _, m := range runningApp {
 		if m != nil {
@@ -353,4 +422,16 @@ func stopAll() {
 			}
 		}
 	}
+}
+
+func list() {
+
+}
+
+func restart() {
+
+}
+
+func initApp() {
+
 }

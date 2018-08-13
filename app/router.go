@@ -25,7 +25,7 @@ type routerBuilder struct {
 	methods []*routerMethod
 }
 
-func NewRouterBuild(router Router, ctrl interface{}) RouterBuilder {
+func newRouterBuild(router Router, ctrl interface{}) RouterBuilder {
 	return &routerBuilder{router: router, ctrl: ctrl}
 }
 

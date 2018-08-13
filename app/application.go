@@ -18,10 +18,29 @@ import (
 	"github.com/snippetor/bingo/utils"
 	"reflect"
 	"github.com/snippetor/bingo/module"
+	"github.com/snippetor/bingo/log/fwlogger"
+	"github.com/snippetor/bingo/log"
+	"strings"
+	"strconv"
+	"github.com/valyala/fasthttp"
+	"github.com/snippetor/bingo/middleware/latency"
+	"os"
+	"path"
+	"github.com/snippetor/bingo/middleware/recover"
+	"github.com/snippetor/bingo/mvc"
+	"github.com/snippetor/bingo/rpc"
+	"github.com/snippetor/bingo/net"
+	"github.com/snippetor/bingo/codec"
 )
 
 type Application interface {
 	Name() string
+	SetLogLevel(level log.Level)
+	Run()
+	ShutDown()
+
+	// mvc objects
+	RegisterMVCObjects(...interface{})
 
 	// modules
 	AddModule(module.Module)
@@ -46,22 +65,31 @@ var _ Application = (*application)(nil)
 
 // model
 type application struct {
-	name    string
-	config  utils.ValueMap
-	modules map[string]module.Module
+	name          string
+	config        utils.ValueMap
+	modules       map[string]module.Module
+	mvcObjs       []interface{}
+	defaultRouter Router
 
 	rpcCtxPool     *Pool
 	serviceCtxPool *Pool
 	webApiCtxPool  *Pool
 
 	globalMiddleWares Handlers
+	endRunning        chan bool
 }
 
-func New(name string, config utils.ValueMap) Application {
+func New(appName string) Application {
+	wd, _ := os.Getwd()
+	return NewWithConfig(appName, path.Join(wd, "bingo.yaml"))
+}
+
+func NewWithConfig(appName string, configFilePath string) Application {
 	a := &application{
-		name:    name,
-		config:  config,
-		modules: make(map[string]module.Module),
+		name:          appName,
+		modules:       make(map[string]module.Module),
+		defaultRouter: NewRouter(),
+		endRunning:    make(chan bool, 1),
 	}
 	a.rpcCtxPool = NewPool(func() Context {
 		return &RpcContext{
@@ -78,11 +106,215 @@ func New(name string, config utils.ValueMap) Application {
 			Context: NewContext(a),
 		}
 	})
+	parse(configFilePath)
 	return a
+}
+
+func (a *application) Run() {
+	appConfig := findApp(a.name)
+	if appConfig == nil {
+		fwlogger.E("-- run app failed! not found app config by name %s --", a.name)
+		return
+	}
+	// config
+	a.config = utils.NewValueMap()
+	for k, v := range appConfig.Config {
+		a.config.Put(k, v)
+	}
+	// middleware
+	a.Use(recover.New(), latency.New())
+	// db
+	for t, c := range appConfig.DB {
+		if t == "mongo" {
+			a.AddModule(module.NewMongoModule(c.Addr, c.User, c.Pwd, c.Db))
+		} else if t == "mysql" {
+			a.AddModule(module.NewMysqlModule(c.Addr, c.User, c.Pwd, c.Db, c.TbPrefix))
+		}
+	}
+	// init mvc objects
+	for _, obj := range a.mvcObjs {
+		if mvc.IsController(obj) {
+			builder := newRouterBuild(a.defaultRouter, obj)
+			obj.(mvc.Controller).Route(builder)
+			builder.Build()
+		} else if mvc.IsOrmModel(obj) {
+			a.MySql().AutoMigrate(obj.(mvc.MysqlOrmModel))
+		}
+	}
+	// log
+	/**
+	"level": 0,
+          "outputType": 3,
+          "outputDir": ".",
+          "rollingType": 3,
+          "fileName": "dev-err",
+          "fileNameDatePattern": 20060102,
+          "fileNameExt": ".log",
+          "fileMaxSize": "1KB",
+          "fileScanInterval": 3
+	 */
+	loggers := module.Loggers{}
+	if appConfig.LogConfigs != nil {
+		for _, c := range appConfig.LogConfigs {
+			config := log.DEFAULT_CONFIG
+			if c.Level != 0 {
+				config.Level = log.Level(c.Level)
+			}
+			if c.OutputType != 0 {
+				config.OutputType = log.OutputType(c.OutputType)
+			}
+			if c.RollingType != 0 {
+				config.LogFileRollingType = log.RollingType(c.RollingType)
+			}
+			if c.OutputDir != "" {
+				config.LogFileOutputDir = c.OutputDir
+			}
+			if c.FileName != "" {
+				config.LogFileName = c.FileName
+			}
+			if c.FileNameDatePattern != "" {
+				config.LogFileNameDatePattern = c.FileNameDatePattern
+			}
+			if c.FileNameExt != "" {
+				config.LogFileNameExt = c.FileNameExt
+			}
+			if c.FileMaxSize != "" {
+				if i, err := strconv.ParseInt(c.FileMaxSize, 10, 64); err == nil {
+					config.LogFileMaxSize = i
+				} else {
+					if i, err = strconv.ParseInt(c.FileMaxSize[:len(c.FileMaxSize)-2], 10, 64); err == nil {
+						unit := strings.ToUpper(c.FileMaxSize[len(c.FileMaxSize)-2:])
+						if unit == "KB" {
+							config.LogFileMaxSize = i * log.KB
+						} else if unit == "MB" {
+							config.LogFileMaxSize = i * log.MB
+						} else if unit == "GB" {
+							config.LogFileMaxSize = i * log.GB
+						} else if unit == "TB" {
+							config.LogFileMaxSize = i * log.TB
+						}
+					}
+				}
+			}
+			if c.FileScanInterval != 0 {
+				config.LogFileScanInterval = c.FileScanInterval
+			}
+			loggers[c.Name] = log.NewLoggerWithConfig(config)
+		}
+	}
+	a.AddModule(module.NewLogModule(loggers))
+	// rpc
+	var rpcServer *rpc.Server
+	if appConfig.Rpc.Port > 0 {
+		rpcServer = &rpc.Server{}
+		rpcServer.Listen(appConfig.Name, appConfig.ModelName, appConfig.Rpc.Port, func(conn net.IConn, caller string, seq uint32, method string, args *rpc.Args) {
+			ctx := a.RpcCtxPool().Acquire().(*RpcContext)
+			defer a.RpcCtxPool().Release(ctx)
+			ctx.Conn = conn
+			ctx.CallSeq = seq
+			ctx.Method = method
+			ctx.Args = args
+			ctx.Caller = caller
+			a.defaultRouter.OnHandleRequest(ctx)
+		})
+	}
+	var rpcClients []*rpc.Client
+	for _, serverName := range appConfig.Rpc.To {
+		c := &rpc.Client{}
+		serverApp := findApp(serverName)
+		if serverApp != nil {
+			c.Connect(appConfig.Name, appConfig.ModelName, BingoConfiguration().Domains[serverApp.Domain]+":"+strconv.Itoa(serverApp.Rpc.Port), func(conn net.IConn, caller string, seq uint32, method string, args *rpc.Args) {
+				ctx := a.RpcCtxPool().Acquire().(*RpcContext)
+				defer a.RpcCtxPool().Release(ctx)
+				ctx.Conn = conn
+				ctx.CallSeq = seq
+				ctx.Method = method
+				ctx.Args = args
+				ctx.Caller = caller
+				a.defaultRouter.OnHandleRequest(ctx)
+			})
+			rpcClients = append(rpcClients, c)
+		}
+	}
+	a.AddModule(module.NewRPCModule(appConfig.Name, rpcClients, rpcServer))
+	// service
+	services := module.Services{}
+	for _, s := range appConfig.Services {
+		var c codec.ICodec
+		if strings.ToLower(s.Codec) == "json" {
+			c = codec.NewCodec(codec.Json)
+		} else if strings.ToLower(s.Codec) == "protobuf" {
+			c = codec.NewCodec(codec.Protobuf)
+		} else {
+			c = codec.NewCodec(codec.Json)
+		}
+		switch strings.ToLower(s.Type) {
+		case "tcp":
+			serv := net.GoListen(net.Tcp, s.Port, func(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
+				ctx := a.ServiceCtxPool().Acquire().(*ServiceContext)
+				defer a.ServiceCtxPool().Release(ctx)
+				ctx.Conn = conn
+				ctx.MessageId = msgId.MsgId()
+				ctx.MessageType = msgId.Type()
+				ctx.MessageGroup = msgId.Group()
+				ctx.MessageExtra = msgId.Extra()
+				ctx.MessageBody = &MessageBodyWrapper{RawContent: body, Codec: c}
+				ctx.Codec = c
+				a.defaultRouter.OnHandleRequest(ctx)
+			})
+			services[s.Name] = serv
+		case "ws":
+			serv := net.GoListen(net.WebSocket, s.Port, func(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
+				ctx := a.ServiceCtxPool().Acquire().(*ServiceContext)
+				defer a.ServiceCtxPool().Release(ctx)
+				ctx.Conn = conn
+				ctx.MessageId = msgId.MsgId()
+				ctx.MessageType = msgId.Type()
+				ctx.MessageGroup = msgId.Group()
+				ctx.MessageExtra = msgId.Extra()
+				ctx.MessageBody = &MessageBodyWrapper{RawContent: body, Codec: c}
+				ctx.Codec = c
+				a.defaultRouter.OnHandleRequest(ctx)
+			})
+			services[s.Name] = serv
+		case "http":
+			go func() {
+				fwlogger.D("-- http service start on %s --", strconv.Itoa(s.Port))
+				if err := fasthttp.ListenAndServe(":"+strconv.Itoa(s.Port), func(req *fasthttp.RequestCtx) {
+					fwlogger.D("====> %s %s", string(req.Path()), string(req.Request.Body()))
+					ctx := a.WebApiCtxPool().Acquire().(*WebApiContext)
+					defer a.WebApiCtxPool().Release(ctx)
+					ctx.RequestCtx = req
+					ctx.Codec = c
+					a.defaultRouter.OnHandleRequest(ctx)
+				}); err != nil {
+					fwlogger.E("-- startup http service failed! %s --", err.Error())
+				}
+			}()
+		}
+	}
+	a.AddModule(module.NewServiceModule(services))
+
+	select {
+	case <-a.endRunning:
+		a.Destroy()
+	}
+}
+
+func (a *application) ShutDown() {
+	a.endRunning <- true
+}
+
+func (a *application) SetLogLevel(level log.Level) {
+	fwlogger.SetLevel(level)
 }
 
 func (a *application) Name() string {
 	return a.name
+}
+
+func (a *application) RegisterMVCObjects(objs ...interface{}) {
+	a.mvcObjs = append(a.mvcObjs, objs)
 }
 
 func (a *application) AddModule(module module.Module) {

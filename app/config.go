@@ -17,7 +17,6 @@ package app
 import (
 	"io/ioutil"
 	"github.com/snippetor/bingo/log/fwlogger"
-	"encoding/json"
 	"gopkg.in/yaml.v2"
 )
 

@@ -15,11 +15,11 @@
 package net
 
 import (
-	"github.com/gorilla/websocket"
 	"net/http"
 	"strconv"
-	"github.com/snippetor/bingo/comm"
 	"sync"
+
+	"github.com/gorilla/websocket"
 	"github.com/snippetor/bingo/log/fwlogger"
 )
 
@@ -68,7 +68,6 @@ func (c *wsConn) GetNetProtocol() NetProtocol {
 }
 
 type wsServer struct {
-	comm.Configable
 	sync.RWMutex
 	upgrader *websocket.Upgrader
 	callback IMessageCallback
@@ -140,7 +139,6 @@ func (s *wsServer) GetConnection(identity uint32) (IConn, bool) {
 }
 
 type wsClient struct {
-	comm.Configable
 	sync.Mutex
 	serverAddr string
 	callback   IMessageCallback

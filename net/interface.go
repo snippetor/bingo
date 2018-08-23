@@ -15,8 +15,8 @@
 package net
 
 import (
-	errors1 "errors"
 	"github.com/snippetor/bingo/utils"
+	"errors"
 )
 
 /**
@@ -143,7 +143,7 @@ func (c *absConn) Address() string {
 	return "0.0.0.0"
 }
 func (c *absConn) read(*[]byte) (int, error) {
-	return -1, errors1.New("-- not implements --")
+	return -1, errors.New("-- not implements --")
 }
 func (c *absConn) GetNetProtocol() NetProtocol {
 	return -1

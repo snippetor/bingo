@@ -23,7 +23,7 @@ var (
 )
 
 func init() {
-	globalPacker = IMessagePacker(&DefaultMessagePacker{})
+	globalPacker = &DefaultMessagePacker{}
 }
 
 func SetDefaultMessagePacker(packer IMessagePacker) {

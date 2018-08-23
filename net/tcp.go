@@ -17,8 +17,8 @@ package net
 import (
 	"net"
 	"strconv"
-	"github.com/snippetor/bingo/comm"
 	"sync"
+
 	"github.com/snippetor/bingo/log/fwlogger"
 )
 
@@ -63,7 +63,6 @@ func (c *tcpConn) GetNetProtocol() NetProtocol {
 }
 
 type tcpServer struct {
-	comm.Configable
 	sync.RWMutex
 	listener *net.TCPListener
 	clients  map[uint32]IConn
@@ -152,7 +151,6 @@ func (s *tcpServer) Close() {
 }
 
 type tcpClient struct {
-	comm.Configable
 	sync.Mutex
 	serverAddr string
 	callback   IMessageCallback

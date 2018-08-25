@@ -2,6 +2,10 @@
 
  * v0.1 重大重构
  
+ * [rpcx](https://github.com/smallnest/rpcx)
+ * [KCP](https://github.com/xtaci/kcp-go)
+ * [etcd](https://github.com/coreos/etcd)
+ 
  #[完成]
  * RPC，Service消息和webApi将使用MVC模式
  * 提供中间件扩展

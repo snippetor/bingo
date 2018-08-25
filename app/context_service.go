@@ -50,6 +50,8 @@ func (c *ServiceContext) Ack(body interface{}) {
 	default:
 		c.Conn.Send(net.PackId(net.MsgTypeAck, c.MessageGroup, c.MessageExtra, c.MessageId), c.Codec.Marshal(body))
 	}
+	// ACK will stop the execution queue.
+	c.StopExecution()
 }
 
 //Note that: just send to the requester

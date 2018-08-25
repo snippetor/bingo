@@ -1,3 +1,5 @@
+// +build mysql
+
 package mvc
 
 import (
@@ -5,6 +7,11 @@ import (
 	"github.com/snippetor/bingo/errors"
 	"github.com/snippetor/bingo/codec"
 )
+
+var ormModelType = reflect.TypeOf((*MysqlOrmModel)(nil)).Elem()
+func IsOrmModel(i interface{}) bool {
+	return reflect.TypeOf(i).Implements(ormModelType)
+}
 
 type MysqlOrmModel interface {
 	Init(db *gorm.DB, self interface{})

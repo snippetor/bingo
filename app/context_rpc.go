@@ -21,7 +21,7 @@ import (
 
 type RpcContext struct {
 	Context
-	Conn    net.IConn
+	Conn    net.Conn
 	CallSeq uint32
 	Method  string
 	Args    *rpc.Args

@@ -31,7 +31,7 @@ func init() {
 	DefaultCodec = codec.NewCodec(codec.Protobuf)
 }
 
-type LocalCallFunc func(net.IConn, string, uint32, string, *Args)
+type LocalCallFunc func(net.Conn, string, uint32, string, *Args)
 
 type EndStub interface {
 	Call(method string, args *Args) (*Args, bool)
@@ -41,7 +41,7 @@ type EndStub interface {
 type Server struct {
 	name       string
 	modelName  string
-	serv       net.IServer
+	serv       net.Server
 	clients    []*Client
 	l          *sync.RWMutex
 	identifier *utils.Identifier
@@ -64,9 +64,9 @@ func (s *Server) Close() {
 	s.serv.Close()
 }
 
-func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
+func (s *Server) handleMessage(conn net.Conn, msgId net.MessageId, body net.MessageBody) {
 	switch RPC_MSGID(msgId) {
-	case net.MSGID_CONNECT_DISCONNECT:
+	case net.MsgIdConnDisconnect:
 		for i, c := range s.clients {
 			if c.conn.Identity() == conn.Identity() {
 				s.l.Lock()
@@ -87,7 +87,7 @@ func (s *Server) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 		c.conn = conn
 		c.EndName = handshake.EndName
 		c.EndModelName = handshake.EndModelName
-		c.state = net.STATE_CONNECTED
+		c.state = net.ConnStateConnected
 		c.addr = conn.Address()
 		c.identifier = utils.NewIdentifier(3)
 		c.l = &sync.RWMutex{}
@@ -129,14 +129,14 @@ type Client struct {
 	modelName    string
 	EndName      string // 远端节点名称
 	EndModelName string // 远端节点模型名
-	conn         net.IConn
+	conn         net.Conn
 	l            *sync.RWMutex
 	addr         string
 	state        net.ConnState
 	identifier   *utils.Identifier
 	callSyncWorker
 	forceClose   bool
-	tcpClient    net.IClient
+	tcpClient    net.Client
 	LocalCallFunc
 }
 
@@ -144,14 +144,14 @@ func (c *Client) Connect(name, modelName, serverAddress string, callFunc LocalCa
 	c.name = name
 	c.modelName = modelName
 	c.LocalCallFunc = callFunc
-	c.state = net.STATE_CONNECTING
+	c.state = net.ConnStateConnecting
 	c.addr = serverAddress
 	c.identifier = utils.NewIdentifier(3)
 	c.l = &sync.RWMutex{}
 	if client := net.GoConnect(net.Tcp, serverAddress, c.handleMessage); client == nil {
-		c.state = net.STATE_CLOSED
+		c.state = net.ConnStateClosed
 	} else {
-		c.state = net.STATE_CONNECTED
+		c.state = net.ConnStateConnected
 		c.tcpClient = client
 	}
 }
@@ -203,18 +203,18 @@ func (c *Client) CallNoReturn(method string, args *Args) bool {
 	return false
 }
 
-func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
+func (c *Client) handleMessage(conn net.Conn, msgId net.MessageId, body net.MessageBody) {
 	switch RPC_MSGID(msgId) {
-	case RPC_MSGID(net.MSGID_CONNECT_CONNECTED):
+	case RPC_MSGID(net.MsgIdConnConnect):
 		fwlogger.D("-- %s connect RPC server success  --", c.EndName)
 		// send handshake to RPC server
 		body := DefaultCodec.Marshal(&RPCHandShake{EndName: c.name, EndModelName: c.modelName})
 		if !conn.Send(net.MessageId(RPC_MSGID_HANDSHAKE), body) {
 			fwlogger.E("-- send handshake %s failed! send message failed --", c.EndName)
 		}
-	case RPC_MSGID(net.MSGID_CONNECT_DISCONNECT):
+	case RPC_MSGID(net.MsgIdConnDisconnect):
 		c.conn = nil
-		c.state = net.STATE_CLOSED
+		c.state = net.ConnStateClosed
 		if !c.forceClose {
 			c.reconnect()
 		}
@@ -241,7 +241,7 @@ func (c *Client) handleMessage(conn net.IConn, msgId net.MessageId, body net.Mes
 }
 
 func (c *Client) reconnect() {
-	if net.STATE_CLOSED == c.state {
+	if net.ConnStateClosed == c.state {
 		time.Sleep(5 * time.Second)
 		fwlogger.D("@reconnect RPC, remote address=%s", c.addr)
 		c.tcpClient.Reconnect()

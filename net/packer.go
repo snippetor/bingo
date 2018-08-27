@@ -21,12 +21,20 @@ import (
 	"github.com/snippetor/bingo/log/fwlogger"
 )
 
-// 消息包
-type DefaultMessagePacker struct {
+// 消息封装器接口
+type MessagePacker interface {
+	// 封包，传入消息ID和包体，返回字节集
+	Pack(MessageId, MessageBody) []byte
+	// 解包，传入符合包结构的字节集，返回消息ID，包体，剩余内容
+	Unpack([]byte) (MessageId, MessageBody, []byte)
 }
 
-// TODO 性能优化，目前 3000000	       541 ns/op
-func (p *DefaultMessagePacker) Pack(messageId MessageId, body MessageBody) []byte {
+// 消息包
+type messagePacker struct {
+}
+
+// 3000000	       541 ns/op
+func (p *messagePacker) Pack(messageId MessageId, body MessageBody) []byte {
 	bodyLen := len(body)
 	if body != nil && bodyLen > math.MaxInt32 {
 		fwlogger.E("-- MessagePacker - body length is too large! %d --", len(body))
@@ -52,7 +60,8 @@ func (p *DefaultMessagePacker) Pack(messageId MessageId, body MessageBody) []byt
 	return pk
 }
 
-func (p *DefaultMessagePacker) Unpack(buffer []byte) (MessageId, MessageBody, []byte) {
+// 10000000	       157 ns/op
+func (p *messagePacker) Unpack(buffer []byte) (MessageId, MessageBody, []byte) {
 	if buffer == nil || len(buffer) == 0 {
 		return -1, nil, buffer
 	}
@@ -70,7 +79,7 @@ func (p *DefaultMessagePacker) Unpack(buffer []byte) (MessageId, MessageBody, []
 		buf.Write(buffer[4:8])
 		binary.Read(buf, binary.BigEndian, &id)
 		// 剩余为包体
-		ret := buffer[8:4+length]
+		ret := buffer[8 : 4+length]
 		if int(4+length) < len(buffer) {
 			buffer = buffer[4+length:]
 		} else {

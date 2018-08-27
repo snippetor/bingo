@@ -6,7 +6,7 @@ import (
 )
 
 func TestMessagePacker(t *testing.T) {
-	p := &DefaultMessagePacker{}
+	p := &messagePacker{}
 	out := p.Pack(128, []byte("test_packer"))
 	id, content, _ := p.Unpack(out)
 	if id != 128 || string(content) != "test_packer" {
@@ -16,7 +16,7 @@ func TestMessagePacker(t *testing.T) {
 }
 
 func TestMessagePacker1(t *testing.T) {
-	p := &DefaultMessagePacker{}
+	p := &messagePacker{}
 	out := p.Pack(-123, []byte("中文测试"))
 	id, content, _ := p.Unpack(out)
 	if id != -123 || string(content) != "中文测试" {
@@ -26,7 +26,7 @@ func TestMessagePacker1(t *testing.T) {
 }
 
 func TestMessagePacker2(t *testing.T) {
-	p := &DefaultMessagePacker{}
+	p := &messagePacker{}
 	out := p.Pack(-123, []byte(`{"a":"a", "b":1.1}`))
 	id, content, _ := p.Unpack(out)
 	if id != -123 || string(content) != `{"a":"a", "b":1.1}` {
@@ -36,7 +36,7 @@ func TestMessagePacker2(t *testing.T) {
 }
 
 func TestMessagePacker3(t *testing.T) {
-	p := &DefaultMessagePacker{}
+	p := &messagePacker{}
 	out := p.Pack(-123, []byte(`{"a":"a", "b":1.1}`))
 	out = append(out, []byte("[append]")...)
 	id, content, out := p.Unpack(out)
@@ -48,7 +48,7 @@ func TestMessagePacker3(t *testing.T) {
 
 func BenchmarkDefaultMessagePacker_Pack(b *testing.B) {
 	b.StopTimer()
-	p := &DefaultMessagePacker{}
+	p := &messagePacker{}
 	b.StartTimer()
 	for i:=0; i<b.N; i++  {
 		p.Pack(123, []byte(`{"a":"a", "b":1.1}`))
@@ -57,7 +57,7 @@ func BenchmarkDefaultMessagePacker_Pack(b *testing.B) {
 
 func BenchmarkDefaultMessagePacker_Unpack(b *testing.B) {
 	b.StopTimer()
-	p := &DefaultMessagePacker{}
+	p := &messagePacker{}
 	out := p.Pack(-123, []byte(`{"a":"a", "b":1.1}`))
 	b.StartTimer()
 	for i:=0; i<b.N; i++  {

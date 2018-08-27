@@ -8,7 +8,6 @@ import (
 )
 
 func TestGenCallSeq(t *testing.T) {
-
 }
 
 func TestMap(t *testing.T) {

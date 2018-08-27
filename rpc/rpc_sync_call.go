@@ -26,7 +26,7 @@ type RPCCallback func(*Args)
 type callTask struct {
 	seq        uint32
 	method     string
-	conn       net.IConn
+	conn       net.Conn
 	msg        net.MessageBody
 	c          RPCCallback
 	t          int64
@@ -56,7 +56,7 @@ func (w *callSyncWorker) waitingResult(t *callTask) {
 							w.callTasks.Delete(k)
 						} else {
 							task := v.(*callTask)
-							if task == nil || task.conn == nil || task.conn.GetState() == net.STATE_CLOSED || task.c == nil { //无效任务，移除
+							if task == nil || task.conn == nil || task.conn.GetState() == net.ConnStateClosed || task.c == nil { //无效任务，移除
 								w.callTasks.Delete(k)
 							} else {
 								if (now.UnixNano() - task.t) > int64(2*time.Second) { // 两秒超时

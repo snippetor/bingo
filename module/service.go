@@ -2,12 +2,12 @@ package module
 
 import "github.com/snippetor/bingo/net"
 
-type Services map[string]net.IServer
+type Services map[string]net.Server
 
 // service
 type ServiceModule interface {
 	Module
-	GetService(name string) (net.IServer, bool)
+	GetService(name string) (net.Server, bool)
 }
 
 type serviceModule struct {
@@ -18,7 +18,7 @@ func NewServiceModule(servers Services) ServiceModule {
 	return &serviceModule{servers}
 }
 
-func (m *serviceModule) GetService(name string) (net.IServer, bool) {
+func (m *serviceModule) GetService(name string) (net.Server, bool) {
 	if m.servers != nil {
 		if c, ok := m.servers[name]; ok {
 			return c, ok

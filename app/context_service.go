@@ -1,13 +1,13 @@
 package app
 
 import (
-	"github.com/snippetor/bingo/net"
 	"github.com/snippetor/bingo/codec"
+	"github.com/snippetor/bingo/net"
 )
 
 type ServiceContext struct {
 	Context
-	Conn         net.IConn
+	Conn         net.Conn
 	MessageType  int32
 	MessageGroup int32
 	MessageExtra int32

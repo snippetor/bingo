@@ -207,7 +207,7 @@ func (a *application) Run() {
 	var rpcServer *rpc.Server
 	if appConfig.Rpc.Port > 0 {
 		rpcServer = &rpc.Server{}
-		rpcServer.Listen(appConfig.Name, appConfig.ModelName, appConfig.Rpc.Port, func(conn net.IConn, caller string, seq uint32, method string, args *rpc.Args) {
+		rpcServer.Listen(appConfig.Name, appConfig.ModelName, appConfig.Rpc.Port, func(conn net.Conn, caller string, seq uint32, method string, args *rpc.Args) {
 			ctx := a.RpcCtxPool().Acquire().(*RpcContext)
 			defer a.RpcCtxPool().Release(ctx)
 			ctx.Conn = conn
@@ -223,7 +223,7 @@ func (a *application) Run() {
 		c := &rpc.Client{}
 		serverApp := findApp(serverName)
 		if serverApp != nil {
-			c.Connect(appConfig.Name, appConfig.ModelName, BingoConfiguration().Domains[serverApp.Domain]+":"+strconv.Itoa(serverApp.Rpc.Port), func(conn net.IConn, caller string, seq uint32, method string, args *rpc.Args) {
+			c.Connect(appConfig.Name, appConfig.ModelName, BingoConfiguration().Domains[serverApp.Domain]+":"+strconv.Itoa(serverApp.Rpc.Port), func(conn net.Conn, caller string, seq uint32, method string, args *rpc.Args) {
 				ctx := a.RpcCtxPool().Acquire().(*RpcContext)
 				defer a.RpcCtxPool().Release(ctx)
 				ctx.Conn = conn
@@ -250,7 +250,7 @@ func (a *application) Run() {
 		}
 		switch strings.ToLower(s.Type) {
 		case "tcp":
-			serv := net.GoListen(net.Tcp, s.Port, func(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
+			serv := net.GoListen(net.Tcp, s.Port, func(conn net.Conn, msgId net.MessageId, body net.MessageBody) {
 				ctx := a.ServiceCtxPool().Acquire().(*ServiceContext)
 				defer a.ServiceCtxPool().Release(ctx)
 				ctx.Conn = conn
@@ -264,7 +264,7 @@ func (a *application) Run() {
 			})
 			services[s.Name] = serv
 		case "ws":
-			serv := net.GoListen(net.WebSocket, s.Port, func(conn net.IConn, msgId net.MessageId, body net.MessageBody) {
+			serv := net.GoListen(net.WebSocket, s.Port, func(conn net.Conn, msgId net.MessageId, body net.MessageBody) {
 				ctx := a.ServiceCtxPool().Acquire().(*ServiceContext)
 				defer a.ServiceCtxPool().Release(ctx)
 				ctx.Conn = conn

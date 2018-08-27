@@ -23,77 +23,33 @@ import (
 	"github.com/snippetor/bingo/log/fwlogger"
 )
 
-type wsConn struct {
-	conn *websocket.Conn
-	absConn
-}
-
-func (c *wsConn) Send(msgId MessageId, body MessageBody) bool {
-	if c.conn != nil && body != nil && len(body) > 0 {
-		c.conn.WriteMessage(websocket.BinaryMessage, GetDefaultMessagePacker().Pack(msgId, body))
-		return true
-	} else {
-		fwlogger.W("-- send message failed!!! --")
-		return false
-	}
-}
-
-func (c *wsConn) read(buf *[]byte) (int, error) {
-	if c.conn != nil {
-		t, msg, err := c.conn.ReadMessage()
-		if err == nil && t == websocket.BinaryMessage {
-			*buf = msg
-			return len(msg), nil
-		}
-	}
-	return -1, nil
-}
-
-func (c *wsConn) Close() {
-	if c.conn != nil {
-		c.conn.Close()
-		c.conn = nil
-	}
-}
-
-func (c *wsConn) Address() string {
-	if c.conn != nil {
-		return c.conn.RemoteAddr().String()
-	}
-	return "0:0:0:0"
-}
-
-func (c *wsConn) GetNetProtocol() NetProtocol {
-	return WebSocket
-}
-
 type wsServer struct {
 	sync.RWMutex
 	upgrader *websocket.Upgrader
-	callback IMessageCallback
-	clients  map[uint32]IConn
+	callback MessageCallback
+	clients  map[uint32]Conn
 }
 
 func (s *wsServer) wsHttpHandle(w http.ResponseWriter, r *http.Request) {
 	if conn, err := s.upgrader.Upgrade(w, r, nil); err == nil {
-		c := IConn(&wsConn{conn: conn})
-		c.setState(STATE_CONNECTED)
+		c := &wsConn{conn: conn}
+		c.setState(ConnStateConnected)
 		s.Lock()
 		s.clients[c.Identity()] = c
 		s.Unlock()
-		s.callback(c, MSGID_CONNECT_CONNECTED, nil)
+		s.callback(c, MsgIdConnConnect, nil)
 		go s.handleConnection(c, s.callback)
 	} else {
 		fwlogger.E("-- ws build connection failed!!! --")
 	}
 }
 
-func (s *wsServer) listen(port int, callback IMessageCallback) bool {
+func (s *wsServer) listen(port int, callback MessageCallback) bool {
 	if s.upgrader == nil {
 		s.upgrader = &websocket.Upgrader{}
 	}
 	s.callback = callback
-	s.clients = make(map[uint32]IConn, 0)
+	s.clients = make(map[uint32]Conn, 0)
 	http.HandleFunc("/", s.wsHttpHandle)
 	if err := http.ListenAndServe("localhost:"+strconv.Itoa(port), nil); err != nil {
 		fwlogger.E(err.Error())
@@ -105,29 +61,28 @@ func (s *wsServer) listen(port int, callback IMessageCallback) bool {
 func (s *wsServer) Close() {
 }
 
-func (s *wsServer) handleConnection(conn IConn, callback IMessageCallback) {
+func (s *wsServer) handleConnection(conn Conn, callback MessageCallback) {
 	var buf []byte
 	defer conn.Close()
 	for {
 		_, err := conn.read(&buf)
 		if err != nil {
 			fwlogger.E(err.Error())
-			conn.setState(STATE_CLOSED)
-			callback(conn, MSGID_CONNECT_DISCONNECT, nil)
+			conn.setState(ConnStateClosed)
+			callback(conn, MsgIdConnDisconnect, nil)
 			s.Lock()
 			delete(s.clients, conn.Identity())
 			s.Unlock()
 			break
 		}
-		packer := GetDefaultMessagePacker()
-		id, body, _ := packer.Unpack(buf)
+		id, body, _ := globalPacker.Unpack(buf)
 		if body != nil {
 			callback(conn, id, body)
 		}
 	}
 }
 
-func (s *wsServer) GetConnection(identity uint32) (IConn, bool) {
+func (s *wsServer) GetConnection(identity uint32) (Conn, bool) {
 	s.RLock()
 	defer s.RUnlock()
 	if s.clients == nil {
@@ -141,45 +96,44 @@ func (s *wsServer) GetConnection(identity uint32) (IConn, bool) {
 type wsClient struct {
 	sync.Mutex
 	serverAddr string
-	callback   IMessageCallback
-	conn       IConn
+	callback   MessageCallback
+	conn       Conn
 }
 
 func (c *wsClient) Reconnect() {
 	c.connect(c.serverAddr, c.callback)
 }
 
-func (c *wsClient) connect(serverAddr string, callback IMessageCallback) bool {
+func (c *wsClient) connect(serverAddr string, callback MessageCallback) bool {
 	c.serverAddr = serverAddr
 	c.callback = callback
 	conn, _, err := websocket.DefaultDialer.Dial(serverAddr, nil)
 	fwlogger.I("Ws connect server ok :%s", serverAddr)
 	if err != nil {
 		fwlogger.E(err.Error())
-		callback(nil, MSGID_CONNECT_DISCONNECT, nil)
+		callback(nil, MsgIdConnDisconnect, nil)
 		return false
 	}
-	c.conn = IConn(&wsConn{conn: conn})
-	c.conn.setState(STATE_CONNECTED)
-	callback(c.conn, MSGID_CONNECT_CONNECTED, nil)
+	c.conn = Conn(&wsConn{conn: conn})
+	c.conn.setState(ConnStateConnected)
+	callback(c.conn, MsgIdConnConnect, nil)
 	c.handleConnection(c.conn, callback)
 	return true
 }
 
-func (c *wsClient) handleConnection(conn IConn, callback IMessageCallback) {
+func (c *wsClient) handleConnection(conn Conn, callback MessageCallback) {
 	var buf []byte
 	defer conn.Close()
 	for {
 		_, err := conn.read(&buf)
 		if err != nil {
 			fwlogger.E(err.Error())
-			c.conn.setState(STATE_CLOSED)
-			callback(conn, MSGID_CONNECT_DISCONNECT, nil)
+			c.conn.setState(ConnStateClosed)
+			callback(conn, MsgIdConnDisconnect, nil)
 			c.conn = nil
 			break
 		}
-		packer := GetDefaultMessagePacker()
-		id, body, _ := packer.Unpack(buf)
+		id, body, _ := globalPacker.Unpack(buf)
 		if body != nil {
 			callback(conn, id, body)
 		}
@@ -189,7 +143,7 @@ func (c *wsClient) handleConnection(conn IConn, callback IMessageCallback) {
 func (c *wsClient) Send(msgId MessageId, body MessageBody) bool {
 	c.Lock()
 	defer c.Unlock()
-	if c.conn != nil && c.conn.GetState() == STATE_CONNECTED {
+	if c.conn != nil && c.conn.State() == ConnStateConnected {
 		return c.conn.Send(msgId, body)
 	} else {
 		fwlogger.W("-- send tcp message failed!!! conn wrong state --")

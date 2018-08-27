@@ -22,25 +22,22 @@ import (
 	"github.com/rcrowley/go-metrics"
 	"github.com/smallnest/rpcx/serverplugin"
 	"context"
+	"github.com/smallnest/rpcx/protocol"
+	"github.com/gogo/protobuf/proto"
+	"errors"
+	"github.com/snippetor/bingo/codec"
+	"github.com/snippetor/bingo/net"
 )
 
-type LocalCallFunc func(args interface{}, reply interface{}) error
-
 type Server struct {
-	name     string
-	appName  string
-	serv     *server.Server
-	callFunc LocalCallFunc
+	name    string
+	appName string
+	serv    *server.Server
 }
 
-func (s *Server) OnCall(ctx context.Context, args []byte, reply []byte) error {
-	return s.callFunc(args, reply)
-}
-
-func (s *Server) Listen(name, appName string, port int, etcdAddrs []string, callFunc LocalCallFunc) {
+func (s *Server) Listen(name, appName string, port int, etcdAddrs []string, onInit func(server *Server)) {
 	s.name = name
 	s.appName = appName
-	s.callFunc = callFunc
 	s.serv = server.NewServer()
 	go func() {
 		r := &serverplugin.EtcdRegisterPlugin{
@@ -55,11 +52,17 @@ func (s *Server) Listen(name, appName string, port int, etcdAddrs []string, call
 			panic(err)
 		}
 		s.serv.Plugins.Add(r)
-		s.serv.RegisterFunctionName(appName, "onCall", s.OnCall, "")
+		if onInit != nil {
+			onInit(s)
+		}
 		if err := s.serv.Serve("kcp", ":"+strconv.Itoa(port)); err != nil {
 			panic(err)
 		}
 	}()
+}
+
+func (s *Server) RegisterFunction(name string, fn interface{}) {
+	s.serv.RegisterFunctionName(s.appName, name, fn, "")
 }
 
 func (s *Server) Close() {
@@ -67,30 +70,41 @@ func (s *Server) Close() {
 }
 
 type Client struct {
-	name     string
-	appName  string
-	addr     string
-	client   client.XClient
-	callFunc LocalCallFunc
+	name          string
+	appName       string
+	addr          string
+	ServerAppName string
+	client        client.XClient
 }
 
 func (c *Client) Connect(name, appName, serverAppName string, etcdAddrs []string) {
 	c.name = name
 	c.appName = appName
+	c.ServerAppName = serverAppName
 	d := client.NewEtcdDiscovery("bingo", serverAppName, etcdAddrs, nil)
-	c.client = client.NewXClient(serverAppName, client.Failtry, client.RoundRobin, d, client.DefaultOption)
+	var option = client.DefaultOption
+	option.SerializeType = protocol.SerializeNone
+	c.client = client.NewXClient(serverAppName, client.Failtry, client.RoundRobin, d, option)
 }
 
 func (c *Client) Call(method string, args interface{}, reply interface{}) error {
-	return c.client.Call(context.Background(), method, args, reply)
-}
-
-func (c *Client) CallNoReturn(method string, args interface{}) error {
-	return c.client.Call(context.Background(), method, args, nil)
-}
-
-func (c *Client) CallNoReturn(method string, args interface{}) error {
-	return c.client.Call(context.Background(), method, args, nil)
+	if msg, ok := args.(proto.Message); ok {
+		if body, err := codec.ProtobufCodec.Marshal(msg); err == nil {
+			var ret []byte
+			if err := c.client.Call(context.Background(), "RPC:"+method, body, &ret); err == nil {
+				if ret == nil {
+					return nil
+				}
+				return codec.ProtobufCodec.Unmarshal(net.MessageBody(ret), reply)
+			} else {
+				return err
+			}
+		} else {
+			return err
+		}
+	} else {
+		return errors.New("wrong type of args, should be *proto.Message")
+	}
 }
 
 func (c *Client) Close() {

@@ -28,16 +28,10 @@ type JsonObj struct {
 
 func TestProtocolJson(t *testing.T) {
 	p := json{}
-	bs, err := p.Marshal(&JsonObj{Id: 1, Name: "carl"})
-	if err != nil {
-		t.Fail()
-	}
+	bs := p.Marshal(&JsonObj{Id: 1, Name: "carl"})
 
 	var b JsonObj
-	err = p.Unmarshal(bs, &b)
-	if err != nil {
-		t.Fail()
-	}
+	p.Unmarshal(bs, &b)
 	fmt.Println(b)
 }
 
@@ -46,16 +40,10 @@ func TestProtocolProtobuf(t *testing.T) {
 	persion := &Person{}
 	persion.Id = 1
 	persion.Name = "carl"
-	bs, err := p.Marshal(persion)
-	if err != nil {
-		t.Fail()
-	}
+	bs := p.Marshal(persion)
 
 	persion2 := Person{}
-	err = p.Unmarshal(bs, &persion2)
-	if err != nil {
-		t.Fail()
-	}
+	p.Unmarshal(bs, &persion2)
 	fmt.Println(persion2.Name)
 }
 

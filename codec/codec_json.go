@@ -17,21 +17,18 @@ package codec
 import (
 	json1 "encoding/json"
 	"github.com/snippetor/bingo/net"
-	"github.com/snippetor/bingo/errors"
 )
 
 // JSON消息协议
 type json struct {
 }
 
-func (j *json) Marshal(v interface{}) net.MessageBody {
-	res, err := json1.Marshal(v)
-	errors.Check(err)
-	return res
+func (j *json) Marshal(v interface{}) (net.MessageBody, error) {
+	return json1.Marshal(v)
 }
 
-func (j *json) Unmarshal(data net.MessageBody, v interface{}) {
-	errors.Check(json1.Unmarshal(data, v))
+func (j *json) Unmarshal(data net.MessageBody, v interface{}) error {
+	return json1.Unmarshal(data, v)
 }
 
 func (j *json) Type() int {

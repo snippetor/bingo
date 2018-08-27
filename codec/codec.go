@@ -14,6 +14,8 @@
 
 package codec
 
+import "github.com/snippetor/bingo/net"
+
 type CodecType byte
 
 const (
@@ -21,19 +23,26 @@ const (
 	Protobuf
 )
 
-func NewCodec(t CodecType) ICodec {
+// 数据传输协议，即包体格式
+type Codec interface {
+	Marshal(interface{}) (net.MessageBody, error)
+	Unmarshal(net.MessageBody, interface{}) error
+	Type() int
+}
+
+func NewCodec(t CodecType) Codec {
 	switch t {
 	case Json:
-		return ICodec(&json{})
+		return &json{}
 	case Protobuf:
-		return ICodec(&protoBuf{})
+		return &protoBuf{}
 	}
 	return nil
 }
 
 var (
-	JsonCodec     ICodec
-	ProtobufCodec ICodec
+	JsonCodec     Codec
+	ProtobufCodec Codec
 )
 
 func init() {

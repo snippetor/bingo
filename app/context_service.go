@@ -13,12 +13,12 @@ type ServiceContext struct {
 	MessageExtra int32
 	MessageId    int32 // unpacked id
 	MessageBody  *MessageBodyWrapper
-	Codec        codec.ICodec
+	Codec        codec.Codec
 }
 
 type MessageBodyWrapper struct {
 	RawContent net.MessageBody
-	Codec      codec.ICodec
+	Codec      codec.Codec
 }
 
 func (c *MessageBodyWrapper) Unmarshal(v interface{}) {

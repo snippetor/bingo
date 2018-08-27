@@ -11,7 +11,7 @@ func getRequestLogs(ctx app.Context) string {
 	switch ctx.(type) {
 	case *app.RpcContext:
 		c := ctx.(*app.RpcContext)
-		return fmt.Sprintf("[RPC] '%s' call '%s' method %s#%v args=%v", c.Caller, c.App().Name(), c.Method, c.CallSeq, c.Args)
+		return fmt.Sprintf("[RPC] call '%s' method %s", c.App().Name(), c.Method)
 	case *app.ServiceContext:
 		c := ctx.(*app.ServiceContext)
 		return fmt.Sprintf("[SOC] '%s' %v %v %v %v, %v", c.App().Name(), c.MessageType, c.MessageGroup, c.MessageExtra, c.MessageId, c.MessageBody.RawContent)

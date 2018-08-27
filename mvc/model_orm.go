@@ -1,11 +1,10 @@
-// +build mysql
-
 package mvc
 
 import (
 	"github.com/jinzhu/gorm"
 	"github.com/snippetor/bingo/errors"
 	"github.com/snippetor/bingo/codec"
+	"reflect"
 )
 
 var ormModelType = reflect.TypeOf((*MysqlOrmModel)(nil)).Elem()

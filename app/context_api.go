@@ -8,7 +8,7 @@ import (
 type WebApiContext struct {
 	Context
 	RequestCtx *fasthttp.RequestCtx
-	Codec      codec.ICodec
+	Codec      codec.Codec
 }
 
 // The only one important if you will override the Context
@@ -31,7 +31,10 @@ func (c *WebApiContext) RequestBody(body interface{}) {
 
 func (c *WebApiContext) ResponseOK(body interface{}) {
 	c.RequestCtx.Response.SetStatusCode(fasthttp.StatusOK)
-	bs := c.Codec.Marshal(body)
+	bs, err := c.Codec.Marshal(body)
+	if err != nil {
+		panic(err)
+	}
 	c.RequestCtx.Response.SetBody(bs)
 	c.LogD("<<< %s %s", string(c.RequestCtx.Path()), string(bs))
 }
@@ -40,7 +43,10 @@ func (c *WebApiContext) ResponseFailed(reason string) {
 	c.RequestCtx.Response.SetStatusCode(fasthttp.StatusOK)
 	params := make(map[string]interface{})
 	params["error"] = reason
-	bs := c.Codec.Marshal(params)
+	bs, err := c.Codec.Marshal(params)
+	if err != nil {
+		panic(err)
+	}
 	c.RequestCtx.Response.SetBody(bs)
 	c.LogD("<<< %s %s", string(c.RequestCtx.Path()), string(bs))
 }

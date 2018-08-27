@@ -31,6 +31,7 @@ import (
 	"github.com/snippetor/bingo/rpc"
 	"github.com/snippetor/bingo/net"
 	"github.com/snippetor/bingo/codec"
+	context2 "context"
 )
 
 type Application interface {
@@ -207,15 +208,16 @@ func (a *application) Run() {
 	var rpcServer *rpc.Server
 	if appConfig.Rpc.Port > 0 {
 		rpcServer = &rpc.Server{}
-		rpcServer.Listen(appConfig.Name, appConfig.ModelName, appConfig.Rpc.Port, func(conn net.Conn, caller string, seq uint32, method string, args *rpc.Args) {
-			ctx := a.RpcCtxPool().Acquire().(*RpcContext)
-			defer a.RpcCtxPool().Release(ctx)
-			ctx.Conn = conn
-			ctx.CallSeq = seq
-			ctx.Method = method
-			ctx.Args = args
-			ctx.Caller = caller
-			a.defaultRouter.OnHandleRequest(ctx)
+		rpcServer.Listen(appConfig.Name, appConfig.ModelName, appConfig.Rpc.Port, []string{}, func(server *rpc.Server) {
+			for key := range a.defaultRouter.Handlers("RPC") {
+				server.RegisterFunction(key, func(c context2.Context, args []byte, reply *[]byte) {
+					ctx := a.RpcCtxPool().Acquire().(*RpcContext)
+					defer a.RpcCtxPool().Release(ctx)
+					ctx.args = args
+					ctx.reply = reply
+					a.defaultRouter.OnHandleRequest(ctx)
+				})
+			}
 		})
 	}
 	var rpcClients []*rpc.Client
@@ -223,16 +225,7 @@ func (a *application) Run() {
 		c := &rpc.Client{}
 		serverApp := findApp(serverName)
 		if serverApp != nil {
-			c.Connect(appConfig.Name, appConfig.ModelName, BingoConfiguration().Domains[serverApp.Domain]+":"+strconv.Itoa(serverApp.Rpc.Port), func(conn net.Conn, caller string, seq uint32, method string, args *rpc.Args) {
-				ctx := a.RpcCtxPool().Acquire().(*RpcContext)
-				defer a.RpcCtxPool().Release(ctx)
-				ctx.Conn = conn
-				ctx.CallSeq = seq
-				ctx.Method = method
-				ctx.Args = args
-				ctx.Caller = caller
-				a.defaultRouter.OnHandleRequest(ctx)
-			})
+			c.Connect(appConfig.Name, appConfig.ModelName, BingoConfiguration().Domains[serverApp.Domain]+":"+strconv.Itoa(serverApp.Rpc.Port), []string{})
 			rpcClients = append(rpcClients, c)
 		}
 	}
@@ -240,7 +233,7 @@ func (a *application) Run() {
 	// service
 	services := module.Services{}
 	for _, s := range appConfig.Services {
-		var c codec.ICodec
+		var c codec.Codec
 		if strings.ToLower(s.Codec) == "json" {
 			c = codec.NewCodec(codec.Json)
 		} else if strings.ToLower(s.Codec) == "protobuf" {

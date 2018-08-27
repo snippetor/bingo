@@ -15,14 +15,15 @@
 package app
 
 import (
-	"github.com/snippetor/bingo/net"
-	"github.com/snippetor/bingo/rpc"
+	"github.com/snippetor/bingo/codec"
+	"github.com/gogo/protobuf/proto"
 )
 
 type RpcContext struct {
 	Context
-	args  interface{}
-	reply interface{}
+	Method string
+	args   []byte
+	reply  *[]byte
 }
 
 // The only one important if you will override the Context
@@ -40,21 +41,25 @@ func (c *RpcContext) Next() {
 }
 
 func (c *RpcContext) Args(i interface{}) {
-	*i = *c.args
+	err := codec.ProtobufCodec.Unmarshal(c.args, i)
+	if err != nil {
+		panic(err)
+	}
 }
 
-func (c *RpcContext) Return(r *rpc.Args) {
-	res := make(map[string]*rpc.RPCValue)
-	r.ToRPCMap(&res)
-	body := rpc.DefaultCodec.Marshal(&rpc.RPCMethodReturn{CallSeq: c.CallSeq, Method: c.Method, Returns: res})
-	if !c.Conn.Send(net.MessageId(rpc.RPC_MSGID_RETURN), body) {
-		c.LogE("-- return rpc method %s failed! send message failed --", c.Method)
+func (c *RpcContext) Return(i interface{}) {
+	msg, ok := i.(proto.Message)
+	if !ok {
+		panic("must return proto.Message for RPC reply.")
 	}
+	body, err := codec.ProtobufCodec.Marshal(msg)
+	if err != nil {
+		panic("must return proto.Message for RPC reply.")
+	}
+	*c.reply = body
+	c.StopExecution()
 }
 
 func (c *RpcContext) ReturnNil() {
-	body := rpc.DefaultCodec.Marshal(&rpc.RPCMethodReturn{CallSeq: c.CallSeq, Method: c.Method, Returns: nil})
-	if !c.Conn.Send(net.MessageId(rpc.RPC_MSGID_RETURN), body) {
-		c.LogE("-- return rpc method %s failed! send message failed --", c.Method)
-	}
+	c.StopExecution()
 }

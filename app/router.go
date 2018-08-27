@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"github.com/snippetor/bingo/net"
+	"strings"
 )
 
 type RouterBuilder interface {
@@ -54,15 +55,16 @@ func (r *routerBuilder) Build() {
 
 type Router interface {
 	Handle(key string, handlers ...Handler)
+	Handlers(kind string) map[string]Handlers
 	OnHandleRequest(ctx Context)
 }
 
 type router struct {
-	routes map[interface{}]Handlers
+	routes map[string]Handlers
 }
 
 func NewRouter() Router {
-	r := &router{make(map[interface{}]Handlers)}
+	r := &router{make(map[string]Handlers)}
 	return r
 }
 
@@ -120,12 +122,22 @@ func (r *router) Handle(key string, handlers ...Handler) {
 	mainHandlers := Handlers(handlers)
 	if !r.apply(&mainHandlers) {
 		return
+		if hs, ok := r.routes[key]; ok {
+			r.routes[key] = append(hs, mainHandlers...)
+		} else {
+			r.routes[key] = mainHandlers
+		}
 	}
-	if hs, ok := r.routes[key]; ok {
-		r.routes[key] = append(hs, mainHandlers...)
-	} else {
-		r.routes[key] = mainHandlers
+}
+
+func (r *router) Handlers(kind string) map[string]Handlers {
+	m := make(map[string]Handlers)
+	for key, handlers := range r.routes {
+		if strings.HasPrefix(key, kind) {
+			m[key] = handlers
+		}
 	}
+	return m
 }
 
 func (r *router) buildHandler(h Handler) Handler {

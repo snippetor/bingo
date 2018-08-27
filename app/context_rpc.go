@@ -21,11 +21,8 @@ import (
 
 type RpcContext struct {
 	Context
-	Conn    net.Conn
-	CallSeq uint32
-	Method  string
-	Args    *rpc.Args
-	Caller  string
+	args  interface{}
+	reply interface{}
 }
 
 // The only one important if you will override the Context
@@ -40,6 +37,10 @@ func (c *RpcContext) Do(handlers Handlers) {
 // Required in order to run the chain of handlers via this "*MyContext".
 func (c *RpcContext) Next() {
 	Next(c)
+}
+
+func (c *RpcContext) Args(i interface{}) {
+	*i = *c.args
 }
 
 func (c *RpcContext) Return(r *rpc.Args) {

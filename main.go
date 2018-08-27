@@ -1,7 +1,24 @@
 package main
 
+import (
+	"reflect"
+	"runtime"
+	"fmt"
+)
+
+type A struct {
+}
+
+func Test() {
+}
+
+func HandlerName(h func()) string {
+	pc := reflect.ValueOf(h).Pointer()
+	return runtime.FuncForPC(pc).Name()
+}
 func main() {
 
+	fmt.Println(HandlerName(Test))
 	//flag.Parse()
 	//
 	//c := *c

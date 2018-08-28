@@ -18,7 +18,7 @@ import (
 	"encoding/binary"
 	"bytes"
 	"math"
-	"github.com/snippetor/bingo/log/fwlogger"
+	"github.com/snippetor/bingo/log"
 )
 
 // 消息封装器接口
@@ -37,10 +37,10 @@ type messagePacker struct {
 func (p *messagePacker) Pack(messageId MessageId, body MessageBody) []byte {
 	bodyLen := len(body)
 	if body != nil && bodyLen > math.MaxInt32 {
-		fwlogger.E("-- MessagePacker - body length is too large! %d --", len(body))
+		log.E("MessagePacker - body length is too large! %d", len(body))
 		return nil
 	}
-	pk := make([]byte, 0)
+	var pk []byte
 	// 写入长度
 	buf := bytes.NewBuffer([]byte{})
 	if body == nil {

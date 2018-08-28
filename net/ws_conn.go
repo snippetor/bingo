@@ -16,7 +16,7 @@ package net
 
 import (
 	"github.com/gorilla/websocket"
-	"github.com/snippetor/bingo/log/fwlogger"
+	"github.com/snippetor/bingo/errors"
 )
 
 type wsConn struct {
@@ -24,13 +24,12 @@ type wsConn struct {
 	conn *websocket.Conn
 }
 
-func (c *wsConn) Send(msgId MessageId, body MessageBody) bool {
+func (c *wsConn) Send(msgId MessageId, body MessageBody) error {
 	if c.conn != nil && body != nil && len(body) > 0 {
 		c.conn.WriteMessage(websocket.BinaryMessage, globalPacker.Pack(msgId, body))
-		return true
+		return nil
 	} else {
-		fwlogger.W("-- send message failed!!! --")
-		return false
+		return errors.ConnectionError(errors.ErrCodeConnect)
 	}
 }
 

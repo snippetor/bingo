@@ -19,8 +19,9 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/snippetor/bingo/log/fwlogger"
 	"github.com/xtaci/kcp-go"
+	"github.com/snippetor/bingo/errors"
+	"github.com/snippetor/bingo/log"
 )
 
 type kcpServer struct {
@@ -29,22 +30,21 @@ type kcpServer struct {
 	clients  map[uint32]Conn
 }
 
-func (s *kcpServer) listen(port int, callback MessageCallback) bool {
+func (s *kcpServer) listen(port int, callback MessageCallback) error {
 	listener, err := kcp.Listen(":" + strconv.Itoa(port))
 	if err != nil {
-		fwlogger.E(err.Error())
-		return false
+		return err
 	}
 	defer listener.Close()
 	s.listener = listener
 	s.clients = make(map[uint32]Conn, 0)
-	fwlogger.I("Kcp server runnning on :%d", port)
+	log.I("Kcp server runnning on :%d", port)
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
 			continue
 		}
-		fwlogger.I(conn.RemoteAddr().String()+" %s", " kcp connect success")
+		log.I(conn.RemoteAddr().String()+" %s", " kcp connect success")
 		c := &kcpConn{conn: conn}
 		c.setState(ConnStateConnected)
 		s.Lock()
@@ -53,7 +53,7 @@ func (s *kcpServer) listen(port int, callback MessageCallback) bool {
 		callback(c, MsgIdConnConnect, nil)
 		go s.handleConnection(c, callback)
 	}
-	return true
+	return nil
 }
 
 // 处理消息流
@@ -64,7 +64,7 @@ func (s *kcpServer) handleConnection(conn Conn, callback MessageCallback) {
 	for {
 		l, err := conn.read(&buf)
 		if err != nil {
-			fwlogger.E(err.Error())
+			log.E(err.Error())
 			conn.setState(ConnStateClosed)
 			callback(conn, MsgIdConnDisconnect, nil)
 			s.Lock()
@@ -116,22 +116,21 @@ func (c *kcpClient) Reconnect() {
 	c.connect(c.serverAddr, c.callback)
 }
 
-func (c *kcpClient) connect(serverAddr string, callback MessageCallback) bool {
+func (c *kcpClient) connect(serverAddr string, callback MessageCallback) error {
 	c.serverAddr = serverAddr
 	c.callback = callback
 	conn, err := kcp.Dial(serverAddr)
 	if err != nil {
-		fwlogger.E(err.Error())
 		callback(nil, MsgIdConnDisconnect, nil)
-		return false
+		return err
 	}
 	defer conn.Close()
 	c.conn = &kcpConn{conn: conn}
 	c.conn.setState(ConnStateConnected)
 	callback(c.conn, MsgIdConnConnect, nil)
-	fwlogger.I("Kcp connect server ok :%s", serverAddr)
+	log.I("Kcp connect server ok :%s", serverAddr)
 	c.handleConnection(c.conn, callback)
-	return true
+	return nil
 }
 
 // 处理消息流
@@ -142,7 +141,7 @@ func (c *kcpClient) handleConnection(conn Conn, callback MessageCallback) {
 	for {
 		l, err := conn.read(&buf)
 		if err != nil {
-			fwlogger.E(err.Error())
+			log.E(err.Error())
 			c.conn.setState(ConnStateClosed)
 			callback(conn, MsgIdConnDisconnect, nil)
 			c.conn = nil
@@ -161,15 +160,15 @@ func (c *kcpClient) handleConnection(conn Conn, callback MessageCallback) {
 	}
 }
 
-func (c *kcpClient) Send(msgId MessageId, body MessageBody) bool {
+func (c *kcpClient) Send(msgId MessageId, body MessageBody) error {
 	c.Lock()
 	defer c.Unlock()
 	if c.conn != nil && c.conn.State() == ConnStateConnected {
 		return c.conn.Send(msgId, body)
 	} else {
-		fwlogger.W("-- send tcp message failed!!! conn wrong state --")
+		return errors.ConnectionError(errors.ErrCodeConnect)
 	}
-	return false
+	return nil
 }
 
 func (c *kcpClient) Close() {

@@ -3,6 +3,7 @@ package app
 import (
 	"github.com/snippetor/bingo/codec"
 	"github.com/snippetor/bingo/net"
+	"github.com/snippetor/bingo/errors"
 )
 
 type ServiceContext struct {
@@ -48,7 +49,9 @@ func (c *ServiceContext) Ack(body interface{}) {
 	case []byte, net.MessageBody:
 		c.Conn.Send(net.PackId(net.MsgTypeAck, c.MessageGroup, c.MessageExtra, c.MessageId), body.([]byte))
 	default:
-		c.Conn.Send(net.PackId(net.MsgTypeAck, c.MessageGroup, c.MessageExtra, c.MessageId), c.Codec.Marshal(body))
+		bs, err := c.Codec.Marshal(body)
+		errors.Check(err)
+		c.Conn.Send(net.PackId(net.MsgTypeAck, c.MessageGroup, c.MessageExtra, c.MessageId), bs)
 	}
 	// ACK will stop the execution queue.
 	c.StopExecution()
@@ -64,7 +67,9 @@ func (c *ServiceContext) Ntf(body interface{}) {
 	case []byte, net.MessageBody:
 		c.Conn.Send(net.PackId(net.MsgTypeNtf, c.MessageGroup, c.MessageExtra, c.MessageId), body.([]byte))
 	default:
-		c.Conn.Send(net.PackId(net.MsgTypeNtf, c.MessageGroup, c.MessageExtra, c.MessageId), c.Codec.Marshal(body))
+		bs, err := c.Codec.Marshal(body)
+		errors.Check(err)
+		c.Conn.Send(net.PackId(net.MsgTypeNtf, c.MessageGroup, c.MessageExtra, c.MessageId), bs)
 	}
 }
 
@@ -78,6 +83,8 @@ func (c *ServiceContext) Cmd(body interface{}) {
 	case []byte, net.MessageBody:
 		c.Conn.Send(net.PackId(net.MsgTypeCmd, c.MessageGroup, c.MessageExtra, c.MessageId), body.([]byte))
 	default:
-		c.Conn.Send(net.PackId(net.MsgTypeCmd, c.MessageGroup, c.MessageExtra, c.MessageId), c.Codec.Marshal(body))
+		bs, err := c.Codec.Marshal(body)
+		errors.Check(err)
+		c.Conn.Send(net.PackId(net.MsgTypeCmd, c.MessageGroup, c.MessageExtra, c.MessageId), bs)
 	}
 }

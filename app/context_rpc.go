@@ -24,6 +24,7 @@ type RpcContext struct {
 	Method string
 	args   []byte
 	reply  *[]byte
+	error  error
 }
 
 // The only one important if you will override the Context
@@ -62,4 +63,12 @@ func (c *RpcContext) Return(i interface{}) {
 
 func (c *RpcContext) ReturnNil() {
 	c.StopExecution()
+}
+
+func (c *RpcContext) CheckError(e error) {
+	if e != nil {
+		c.error = e
+		c.StopExecution()
+		panic(e)
+	}
 }

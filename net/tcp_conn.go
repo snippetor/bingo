@@ -2,7 +2,7 @@ package net
 
 import (
 	"net"
-	"github.com/snippetor/bingo/log/fwlogger"
+	"github.com/snippetor/bingo/errors"
 )
 
 type tcpConn struct {
@@ -10,13 +10,12 @@ type tcpConn struct {
 	conn *net.TCPConn
 }
 
-func (c *tcpConn) Send(msgId MessageId, body MessageBody) bool {
+func (c *tcpConn) Send(msgId MessageId, body MessageBody) error {
 	if c.conn != nil && body != nil && len(body) > 0 {
 		c.conn.Write(globalPacker.Pack(msgId, body))
-		return true
+		return nil
 	} else {
-		fwlogger.W("-- send message failed!!! -- %#X", msgId)
-		return false
+		return errors.ConnectionError(errors.ErrCodeConnect)
 	}
 }
 

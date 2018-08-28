@@ -21,7 +21,7 @@ import (
 
 // 网络连接接口
 type Conn interface {
-	Send(msgId MessageId, body MessageBody) bool
+	Send(msgId MessageId, body MessageBody) error
 	Close()
 	Address() string
 	read(*[]byte) (int, error)
@@ -53,8 +53,8 @@ type baseConn struct {
 	state    ConnState
 }
 
-func (c *baseConn) Send(msgId MessageId, body MessageBody) bool {
-	return false
+func (c *baseConn) Send(msgId MessageId, body MessageBody) error {
+	return errors.New("not implements: send")
 }
 
 func (c *baseConn) Close() {
@@ -65,7 +65,7 @@ func (c *baseConn) Address() string {
 }
 
 func (c *baseConn) read(*[]byte) (int, error) {
-	return -1, errors.New("-- not implements --")
+	return -1, errors.New("not implements: read")
 }
 
 func (c *baseConn) NetProtocol() Protocol {

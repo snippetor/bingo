@@ -66,7 +66,9 @@ func (s *Server) RegisterFunction(name string, fn interface{}) {
 }
 
 func (s *Server) Close() {
-	s.serv.Close()
+	if s.serv != nil {
+		s.serv.Close()
+	}
 }
 
 type Client struct {
@@ -108,5 +110,7 @@ func (c *Client) Call(method string, args interface{}, reply interface{}) error 
 }
 
 func (c *Client) Close() {
-	c.client.Close()
+	if c.client != nil {
+		c.client.Close()
+	}
 }

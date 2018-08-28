@@ -20,7 +20,8 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
-	"github.com/snippetor/bingo/log/fwlogger"
+	"github.com/snippetor/bingo/log"
+	"github.com/snippetor/bingo/errors"
 )
 
 type wsServer struct {
@@ -40,11 +41,11 @@ func (s *wsServer) wsHttpHandle(w http.ResponseWriter, r *http.Request) {
 		s.callback(c, MsgIdConnConnect, nil)
 		go s.handleConnection(c, s.callback)
 	} else {
-		fwlogger.E("-- ws build connection failed!!! --")
+		log.E("ws build connection failed!")
 	}
 }
 
-func (s *wsServer) listen(port int, callback MessageCallback) bool {
+func (s *wsServer) listen(port int, callback MessageCallback) error {
 	if s.upgrader == nil {
 		s.upgrader = &websocket.Upgrader{}
 	}
@@ -52,10 +53,9 @@ func (s *wsServer) listen(port int, callback MessageCallback) bool {
 	s.clients = make(map[uint32]Conn, 0)
 	http.HandleFunc("/", s.wsHttpHandle)
 	if err := http.ListenAndServe("localhost:"+strconv.Itoa(port), nil); err != nil {
-		fwlogger.E(err.Error())
-		return false
+		return err
 	}
-	return true
+	return nil
 }
 
 func (s *wsServer) Close() {
@@ -67,7 +67,7 @@ func (s *wsServer) handleConnection(conn Conn, callback MessageCallback) {
 	for {
 		_, err := conn.read(&buf)
 		if err != nil {
-			fwlogger.E(err.Error())
+			log.E(err.Error())
 			conn.setState(ConnStateClosed)
 			callback(conn, MsgIdConnDisconnect, nil)
 			s.Lock()
@@ -104,21 +104,20 @@ func (c *wsClient) Reconnect() {
 	c.connect(c.serverAddr, c.callback)
 }
 
-func (c *wsClient) connect(serverAddr string, callback MessageCallback) bool {
+func (c *wsClient) connect(serverAddr string, callback MessageCallback) error {
 	c.serverAddr = serverAddr
 	c.callback = callback
 	conn, _, err := websocket.DefaultDialer.Dial(serverAddr, nil)
-	fwlogger.I("Ws connect server ok :%s", serverAddr)
 	if err != nil {
-		fwlogger.E(err.Error())
 		callback(nil, MsgIdConnDisconnect, nil)
-		return false
+		return err
 	}
 	c.conn = Conn(&wsConn{conn: conn})
 	c.conn.setState(ConnStateConnected)
 	callback(c.conn, MsgIdConnConnect, nil)
+	log.I("Ws connect server ok :%s", serverAddr)
 	c.handleConnection(c.conn, callback)
-	return true
+	return nil
 }
 
 func (c *wsClient) handleConnection(conn Conn, callback MessageCallback) {
@@ -127,7 +126,7 @@ func (c *wsClient) handleConnection(conn Conn, callback MessageCallback) {
 	for {
 		_, err := conn.read(&buf)
 		if err != nil {
-			fwlogger.E(err.Error())
+			log.E(err.Error())
 			c.conn.setState(ConnStateClosed)
 			callback(conn, MsgIdConnDisconnect, nil)
 			c.conn = nil
@@ -140,15 +139,15 @@ func (c *wsClient) handleConnection(conn Conn, callback MessageCallback) {
 	}
 }
 
-func (c *wsClient) Send(msgId MessageId, body MessageBody) bool {
+func (c *wsClient) Send(msgId MessageId, body MessageBody) error {
 	c.Lock()
 	defer c.Unlock()
 	if c.conn != nil && c.conn.State() == ConnStateConnected {
 		return c.conn.Send(msgId, body)
 	} else {
-		fwlogger.W("-- send tcp message failed!!! conn wrong state --")
+		return errors.ConnectionError(errors.ErrCodeConnect)
 	}
-	return false
+	return nil
 }
 
 func (c *wsClient) Close() {

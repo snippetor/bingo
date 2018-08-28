@@ -8,6 +8,7 @@ import (
 )
 
 var ormModelType = reflect.TypeOf((*MysqlOrmModel)(nil)).Elem()
+
 func IsOrmModel(i interface{}) bool {
 	return reflect.TypeOf(i).Implements(ormModelType)
 }
@@ -67,7 +68,9 @@ func (m *BaseMysqlOrmModel) DelInTx(tx *gorm.DB) {
 }
 
 func (m *BaseMysqlOrmModel) FieldToString(f interface{}) string {
-	return string(codec.JsonCodec.Marshal(f))
+	bs, err := codec.JsonCodec.Marshal(f)
+	errors.Check(err)
+	return string(bs)
 }
 
 func (m *BaseMysqlOrmModel) FieldFromString(s string, f interface{}) {

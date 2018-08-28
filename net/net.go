@@ -15,7 +15,7 @@
 package net
 
 import (
-	"github.com/snippetor/bingo/log/fwlogger"
+	"github.com/snippetor/bingo/errors"
 )
 
 const (
@@ -41,15 +41,15 @@ type MessageCallback func(conn Conn, msgId MessageId, body MessageBody)
 
 // 服务器接口
 type Server interface {
-	listen(int, MessageCallback) bool
+	listen(int, MessageCallback) error
 	GetConnection(uint32) (Conn, bool)
 	Close()
 }
 
 // 客户端接口
 type Client interface {
-	connect(string, MessageCallback) bool
-	Send(msgId MessageId, body MessageBody) bool
+	connect(string, MessageCallback) error
+	Send(msgId MessageId, body MessageBody) error
 	Close()
 	Reconnect()
 }
@@ -114,63 +114,67 @@ func PackId(idType, group, extra, id int32) MessageId {
 }
 
 // 同步执行网络监听
-func Listen(net Protocol, port int, callback MessageCallback) (Server, bool) {
+func Listen(net Protocol, port int, callback MessageCallback) (Server, error) {
 	var server Server
 	switch net {
 	case Tcp:
 		server = &tcpServer{}
 	case WebSocket:
 		server = &wsServer{}
+	case Kcp:
+		server = &kcpServer{}
 	default:
-		fwlogger.E("-- errors net type '%d', must be 'ws' or 'tcp' --", net)
-		return nil, false
+		return nil, &errors.UnknownNetTypeError{UnknownType: int(net)}
 	}
 	return server, server.listen(port, callback)
 }
 
 // 异步执行网络监听
-func GoListen(net Protocol, port int, callback MessageCallback) Server {
+func GoListen(net Protocol, port int, callback MessageCallback) (Server, error) {
 	var server Server
 	switch net {
 	case Tcp:
 		server = &tcpServer{}
 	case WebSocket:
 		server = &wsServer{}
+	case Kcp:
+		server = &kcpServer{}
 	default:
-		fwlogger.E("-- errors net type '%d', must be 'ws' or 'tcp' --", net)
-		return nil
+		return nil, &errors.UnknownNetTypeError{UnknownType: int(net)}
 	}
 	go server.listen(port, callback)
-	return server
+	return server, nil
 }
 
 // 同步连接服务器
-func Connect(net Protocol, serverAddr string, callback MessageCallback) (Client, bool) {
+func Connect(net Protocol, serverAddr string, callback MessageCallback) (Client, error) {
 	var client Client
 	switch net {
 	case Tcp:
 		client = &tcpClient{}
 	case WebSocket:
 		client = &wsClient{}
+	case Kcp:
+		client = &kcpClient{}
 	default:
-		fwlogger.E("-- errors net type '%d', must be 'ws' or 'tcp' --", net)
-		return nil, false
+		return nil, &errors.UnknownNetTypeError{UnknownType: int(net)}
 	}
 	return client, client.connect(serverAddr, callback)
 }
 
 // 异步连接服务器
-func GoConnect(net Protocol, serverAddr string, callback MessageCallback) Client {
+func GoConnect(net Protocol, serverAddr string, callback MessageCallback) (Client, error) {
 	var client Client
 	switch net {
 	case Tcp:
 		client = &tcpClient{}
 	case WebSocket:
 		client = &wsClient{}
+	case Kcp:
+		client = &kcpClient{}
 	default:
-		fwlogger.E("-- errors net type '%d', must be 'ws' or 'tcp' --", net)
-		return nil
+		return nil, &errors.UnknownNetTypeError{UnknownType: int(net)}
 	}
 	go client.connect(serverAddr, callback)
-	return client
+	return client, nil
 }

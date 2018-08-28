@@ -1,8 +1,8 @@
 package net
 
 import (
-	"github.com/snippetor/bingo/log/fwlogger"
 	"net"
+	"github.com/snippetor/bingo/errors"
 )
 
 type kcpConn struct {
@@ -10,13 +10,12 @@ type kcpConn struct {
 	conn net.Conn
 }
 
-func (c *kcpConn) Send(msgId MessageId, body MessageBody) bool {
+func (c *kcpConn) Send(msgId MessageId, body MessageBody) error {
 	if c.conn != nil && body != nil && len(body) > 0 {
 		c.conn.Write(globalPacker.Pack(msgId, body))
-		return true
+		return nil
 	} else {
-		fwlogger.W("-- send message failed!!! -- %#X", msgId)
-		return false
+		return errors.ConnectionError(errors.ErrCodeConnect)
 	}
 }
 

@@ -3,6 +3,8 @@ package net
 import (
 	"testing"
 	"fmt"
+	"strconv"
+	"encoding/json"
 )
 
 func TestMessagePacker(t *testing.T) {
@@ -40,7 +42,7 @@ func TestMessagePacker3(t *testing.T) {
 	out := p.Pack(-123, []byte(`{"a":"a", "b":1.1}`))
 	out = append(out, []byte("[append]")...)
 	id, content, out := p.Unpack(out)
-	if id != -123 || string(content) != `{"a":"a", "b":1.1}` || string(out) != "[append]"{
+	if id != -123 || string(content) != `{"a":"a", "b":1.1}` || string(out) != "[append]" {
 		fmt.Println(id, content)
 		t.Fail()
 	}
@@ -50,8 +52,23 @@ func BenchmarkDefaultMessagePacker_Pack(b *testing.B) {
 	b.StopTimer()
 	p := &messagePacker{}
 	b.StartTimer()
-	for i:=0; i<b.N; i++  {
+	for i := 0; i < b.N; i++ {
 		p.Pack(123, []byte(`{"a":"a", "b":1.1}`))
+	}
+}
+
+func BenchmarkDefaultMessagePacker_Pack1(b *testing.B) {
+	b.StopTimer()
+	p := &messagePacker{}
+	m := make(map[string]interface{})
+	for i := 0; i < 10000; i++ {
+		m[strconv.FormatInt(int64(i), 10)] = i
+	}
+	bytes, _ := json.Marshal(m)
+	fmt.Println(len(bytes))
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		p.Pack(123, bytes)
 	}
 }
 
@@ -60,7 +77,7 @@ func BenchmarkDefaultMessagePacker_Unpack(b *testing.B) {
 	p := &messagePacker{}
 	out := p.Pack(-123, []byte(`{"a":"a", "b":1.1}`))
 	b.StartTimer()
-	for i:=0; i<b.N; i++  {
+	for i := 0; i < b.N; i++ {
 		p.Unpack(out)
 	}
 }

@@ -7,7 +7,8 @@ type Loggers map[string]log.Logger
 // log module
 type LogModule interface {
 	Module
-	GetLogger(name string) log.Logger
+	DefaultLogger() log.Logger
+	Logger(name string) log.Logger
 }
 
 type logModule struct {
@@ -18,13 +19,17 @@ func NewLogModule(loggers Loggers) LogModule {
 	return &logModule{loggers}
 }
 
-func (m *logModule) GetLogger(name string) log.Logger {
+func (m *logModule) DefaultLogger() log.Logger {
+	return m.Logger("default")
+}
+
+func (m *logModule) Logger(name string) log.Logger {
 	if m.loggers != nil {
 		if logger, ok := m.loggers[name]; ok {
 			return logger
 		}
 	}
-	logger := log.NewLoggerWithConfig(&log.Config{
+	logger := log.NewLogger(&log.Config{
 		Level:      log.Info,
 		OutputType: log.Console,
 	})
@@ -37,5 +42,4 @@ func (m *logModule) Close() {
 			logger.Close()
 		}
 	}
-
 }

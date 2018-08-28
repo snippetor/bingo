@@ -19,45 +19,41 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/snippetor/bingo/log/fwlogger"
+	"github.com/snippetor/bingo/errors"
+	"github.com/snippetor/bingo/log"
 )
 
 type tcpServer struct {
-	sync.RWMutex
 	listener *net.TCPListener
-	clients  map[uint32]Conn
+	clients  *sync.Map
 }
 
-func (s *tcpServer) listen(port int, callback MessageCallback) bool {
+func (s *tcpServer) listen(port int, callback MessageCallback) error {
 	addr, err := net.ResolveTCPAddr("tcp", ":"+strconv.Itoa(port))
 	if err != nil {
-		fwlogger.E(err.Error())
-		return false
+		return err
 	}
 	listener, err := net.ListenTCP("tcp", addr)
 	if err != nil {
-		fwlogger.E(err.Error())
-		return false
+		return err
 	}
 	defer listener.Close()
 	s.listener = listener
-	s.clients = make(map[uint32]Conn, 0)
-	fwlogger.I("Tcp server runnning on :%d", port)
+	s.clients = &sync.Map{}
+	log.I("Tcp server runnning on :%d", port)
 	for {
 		conn, err := listener.AcceptTCP()
 		if err != nil {
 			continue
 		}
-		fwlogger.I(conn.RemoteAddr().String()+" %s", " tcp connect success")
+		log.I(conn.RemoteAddr().String()+" %s", " tcp connect success")
 		c := Conn(&tcpConn{conn: conn})
 		c.setState(ConnStateConnected)
-		s.Lock()
-		s.clients[c.Identity()] = c
-		s.Unlock()
+		s.clients.Store(c.Identity(), c)
 		callback(c, MsgIdConnConnect, nil)
 		go s.handleConnection(c, callback)
 	}
-	return true
+	return nil
 }
 
 // 处理消息流
@@ -68,12 +64,10 @@ func (s *tcpServer) handleConnection(conn Conn, callback MessageCallback) {
 	for {
 		l, err := conn.read(&buf)
 		if err != nil {
-			fwlogger.E(err.Error())
+			log.E(err.Error())
 			conn.setState(ConnStateClosed)
 			callback(conn, MsgIdConnDisconnect, nil)
-			s.Lock()
-			delete(s.clients, conn.Identity())
-			s.Unlock()
+			s.clients.Delete(conn.Identity())
 			break
 		}
 		byteBuffer = append(byteBuffer, buf[:l]...)
@@ -90,19 +84,15 @@ func (s *tcpServer) handleConnection(conn Conn, callback MessageCallback) {
 }
 
 func (s *tcpServer) GetConnection(identity uint32) (Conn, bool) {
-	s.RLock()
-	defer s.RUnlock()
 	if s.clients == nil {
 		return nil, false
 	} else {
-		identity, ok := s.clients[identity]
-		return identity, ok
+		identity, ok := s.clients.Load(identifier)
+		return identity.(Conn), ok
 	}
 }
 
 func (s *tcpServer) Close() {
-	s.Lock()
-	defer s.Unlock()
 	if s.listener != nil {
 		s.listener.Close()
 		s.listener = nil
@@ -120,28 +110,26 @@ func (c *tcpClient) Reconnect() {
 	c.connect(c.serverAddr, c.callback)
 }
 
-func (c *tcpClient) connect(serverAddr string, callback MessageCallback) bool {
+func (c *tcpClient) connect(serverAddr string, callback MessageCallback) error {
 	c.serverAddr = serverAddr
 	c.callback = callback
 	addr, err := net.ResolveTCPAddr("tcp", serverAddr)
 	if err != nil {
-		fwlogger.E(err.Error())
 		callback(nil, MsgIdConnDisconnect, nil)
-		return false
+		return err
 	}
 	conn, err := net.DialTCP("tcp", nil, addr)
 	if err != nil {
-		fwlogger.E(err.Error())
 		callback(nil, MsgIdConnDisconnect, nil)
-		return false
+		return err
 	}
 	defer conn.Close()
 	c.conn = Conn(&tcpConn{conn: conn})
 	c.conn.setState(ConnStateConnected)
 	callback(c.conn, MsgIdConnConnect, nil)
-	fwlogger.I("Tcp connect server ok :%s", serverAddr)
+	log.I("Tcp connect server ok :%s", serverAddr)
 	c.handleConnection(c.conn, callback)
-	return true
+	return nil
 }
 
 // 处理消息流
@@ -152,7 +140,7 @@ func (c *tcpClient) handleConnection(conn Conn, callback MessageCallback) {
 	for {
 		l, err := conn.read(&buf)
 		if err != nil {
-			fwlogger.E(err.Error())
+			log.E(err.Error())
 			c.conn.setState(ConnStateClosed)
 			callback(conn, MsgIdConnDisconnect, nil)
 			c.conn = nil
@@ -171,15 +159,15 @@ func (c *tcpClient) handleConnection(conn Conn, callback MessageCallback) {
 	}
 }
 
-func (c *tcpClient) Send(msgId MessageId, body MessageBody) bool {
+func (c *tcpClient) Send(msgId MessageId, body MessageBody) error {
 	c.Lock()
 	defer c.Unlock()
 	if c.conn != nil && c.conn.State() == ConnStateConnected {
 		return c.conn.Send(msgId, body)
 	} else {
-		fwlogger.W("-- send tcp message failed!!! conn wrong state --")
+		return errors.ConnectionError(errors.ErrCodeConnect)
 	}
-	return false
+	return nil
 }
 
 func (c *tcpClient) Close() {

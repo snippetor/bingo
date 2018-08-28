@@ -32,6 +32,7 @@ import (
 	"github.com/snippetor/bingo/net"
 	"github.com/snippetor/bingo/codec"
 	context2 "context"
+	"fmt"
 )
 
 type Application interface {
@@ -80,12 +81,8 @@ type application struct {
 	endRunning        chan bool
 }
 
-func New(appName string) Application {
+func New() Application {
 	wd, _ := os.Getwd()
-	return NewWithConfig(appName, path.Join(wd, "bingo.yaml"))
-}
-
-func NewWithConfig(appName string, configFilePath string) Application {
 	a := &application{
 		name:          appName,
 		modules:       make(map[string]module.Module),
@@ -107,15 +104,26 @@ func NewWithConfig(appName string, configFilePath string) Application {
 			Context: NewContext(a),
 		}
 	})
+
 	parse(configFilePath)
-	return a
+	return NewWithConfig(appName, path.Join(wd, "bingo.yaml"))
 }
 
 func (a *application) Run() {
 	appConfig := findApp(a.name)
 	if appConfig == nil {
-		fwlogger.E("-- run app failed! not found app config by name %s --", a.name)
+		fmt.Errorf("run app failed! not found app config by name %s ", a.name)
 		return
+	}
+	// log
+	loggers := module.Loggers{}
+	for name, c := range appConfig.Logs {
+		loggers[name] = log.NewLogger(c)
+	}
+	a.AddModule(module.NewLogModule(loggers))
+	// default logger
+	if defLogger, ok := loggers["default"]; ok {
+		log.DefaultLogger = defLogger
 	}
 	// config
 	a.config = utils.NewValueMap()
@@ -125,10 +133,10 @@ func (a *application) Run() {
 	// middleware
 	a.Use(recover.New(), latency.New())
 	// db
-	for t, c := range appConfig.DB {
-		if t == "mongo" {
+	for _, c := range appConfig.Db {
+		if c.Type == "mongo" {
 			a.AddModule(module.NewMongoModule(c.Addr, c.User, c.Pwd, c.Db))
-		} else if t == "mysql" {
+		} else if c.Type == "mysql" {
 			a.AddModule(module.NewMysqlModule(c.Addr, c.User, c.Pwd, c.Db, c.TbPrefix))
 		}
 	}
@@ -142,80 +150,19 @@ func (a *application) Run() {
 			a.MySql().AutoMigrate(obj.(mvc.MysqlOrmModel))
 		}
 	}
-	// log
-	/**
-	"level": 0,
-          "outputType": 3,
-          "outputDir": ".",
-          "rollingType": 3,
-          "fileName": "dev-err",
-          "fileNameDatePattern": 20060102,
-          "fileNameExt": ".log",
-          "fileMaxSize": "1KB",
-          "fileScanInterval": 3
-	 */
-	loggers := module.Loggers{}
-	if appConfig.LogConfigs != nil {
-		for _, c := range appConfig.LogConfigs {
-			config := log.DEFAULT_CONFIG
-			if c.Level != 0 {
-				config.Level = log.Level(c.Level)
-			}
-			if c.OutputType != 0 {
-				config.OutputType = log.OutputType(c.OutputType)
-			}
-			if c.RollingType != 0 {
-				config.LogFileRollingType = log.RollingType(c.RollingType)
-			}
-			if c.OutputDir != "" {
-				config.LogFileOutputDir = c.OutputDir
-			}
-			if c.FileName != "" {
-				config.LogFileName = c.FileName
-			}
-			if c.FileNameDatePattern != "" {
-				config.LogFileNameDatePattern = c.FileNameDatePattern
-			}
-			if c.FileNameExt != "" {
-				config.LogFileNameExt = c.FileNameExt
-			}
-			if c.FileMaxSize != "" {
-				if i, err := strconv.ParseInt(c.FileMaxSize, 10, 64); err == nil {
-					config.LogFileMaxSize = i
-				} else {
-					if i, err = strconv.ParseInt(c.FileMaxSize[:len(c.FileMaxSize)-2], 10, 64); err == nil {
-						unit := strings.ToUpper(c.FileMaxSize[len(c.FileMaxSize)-2:])
-						if unit == "KB" {
-							config.LogFileMaxSize = i * log.KB
-						} else if unit == "MB" {
-							config.LogFileMaxSize = i * log.MB
-						} else if unit == "GB" {
-							config.LogFileMaxSize = i * log.GB
-						} else if unit == "TB" {
-							config.LogFileMaxSize = i * log.TB
-						}
-					}
-				}
-			}
-			if c.FileScanInterval != 0 {
-				config.LogFileScanInterval = c.FileScanInterval
-			}
-			loggers[c.Name] = log.NewLoggerWithConfig(config)
-		}
-	}
-	a.AddModule(module.NewLogModule(loggers))
 	// rpc
 	var rpcServer *rpc.Server
 	if appConfig.Rpc.Port > 0 {
 		rpcServer = &rpc.Server{}
 		rpcServer.Listen(appConfig.Name, appConfig.ModelName, appConfig.Rpc.Port, []string{}, func(server *rpc.Server) {
 			for key := range a.defaultRouter.Handlers("RPC") {
-				server.RegisterFunction(key, func(c context2.Context, args []byte, reply *[]byte) {
+				server.RegisterFunction(key, func(c context2.Context, args []byte, reply *[]byte) error {
 					ctx := a.RpcCtxPool().Acquire().(*RpcContext)
 					defer a.RpcCtxPool().Release(ctx)
 					ctx.args = args
 					ctx.reply = reply
 					a.defaultRouter.OnHandleRequest(ctx)
+					return ctx.error
 				})
 			}
 		})

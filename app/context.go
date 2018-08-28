@@ -3,6 +3,7 @@ package app
 import (
 	"sync/atomic"
 	"fmt"
+	"github.com/snippetor/bingo/log"
 )
 
 type Context interface {
@@ -129,7 +130,10 @@ type Context interface {
 
 	LogE(format string, v ...interface{})
 	LogD(format string, v ...interface{})
-	LogBi(format string, v ...interface{})
+	LogW(format string, v ...interface{})
+	LogI(format string, v ...interface{})
+
+	Logger(name string) log.Logger
 }
 
 var _ Context = (*context)(nil)
@@ -418,19 +422,21 @@ func (ctx *context) App() Application {
 
 ///////////////// log ///////////////////////
 func (ctx *context) LogE(format string, v ...interface{}) {
-	if logger := ctx.app.Log().GetLogger("error"); logger != nil {
-		logger.E(fmt.Sprintf("[%010v] ", ctx.Id())+format, v...)
-	}
+	ctx.app.Log().DefaultLogger().E(fmt.Sprintf("[%010v] ", ctx.Id())+format, v...)
 }
 
 func (ctx *context) LogD(format string, v ...interface{}) {
-	if logger := ctx.app.Log().GetLogger("debug"); logger != nil {
-		logger.D(fmt.Sprintf("[%010v] ", ctx.Id())+format, v...)
-	}
+	ctx.app.Log().DefaultLogger().D(fmt.Sprintf("[%010v] ", ctx.Id())+format, v...)
 }
 
-func (ctx *context) LogBi(format string, v ...interface{}) {
-	if logger := ctx.app.Log().GetLogger("bi"); logger != nil {
-		logger.D(fmt.Sprintf("[%010v] ", ctx.Id())+format, v...)
-	}
+func (ctx *context) LogW(format string, v ...interface{}) {
+	ctx.app.Log().DefaultLogger().W(fmt.Sprintf("[%010v] ", ctx.Id())+format, v...)
+}
+
+func (ctx *context) LogI(format string, v ...interface{}) {
+	ctx.app.Log().DefaultLogger().I(fmt.Sprintf("[%010v] ", ctx.Id())+format, v...)
+}
+
+func (ctx *context) Logger(name string) log.Logger {
+	return ctx.app.Log().Logger(name)
 }

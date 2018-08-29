@@ -37,7 +37,6 @@ import (
 
 type Application interface {
 	Name() string
-	SetLogLevel(level log.Level)
 	Run()
 	ShutDown()
 
@@ -243,10 +242,6 @@ func (a *application) Run() {
 
 func (a *application) ShutDown() {
 	a.endRunning <- true
-}
-
-func (a *application) SetLogLevel(level log.Level) {
-	fwlogger.SetLevel(level)
 }
 
 func (a *application) Name() string {

@@ -18,7 +18,23 @@ KB = 1 << 10;
 MB = 1 << 20;
 GB = 1 << 30;
 TB = 1 << 40;
+// 编解码
+Json = "json";
+Protobuf = "protobuf";
+// 网络类型
+Http = "http";
+Kcp = "kcp";
+Tcp = "tcp";
+Websocket = "ws";
 
+/**
+ * 全局配置
+ *
+ * @enableBingoLog: 是否显示框架日志
+ */
+config = {
+    enableBingoLog: true,
+};
 /**
  * apps中定义所有节点配置。
  * 单个节点配置如下：

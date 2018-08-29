@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"sync"
 	"github.com/snippetor/bingo/utils"
+	"github.com/fatih/color"
 )
 
 type Config struct {
@@ -257,13 +258,13 @@ func (l *logger) E(format string, v ...interface{}) {
 func (l *logger) printLog(output *OutputLog) {
 	if l.config.OutputType&Console == Console {
 		if output.level == Info {
-			fmt.Println("\x1B[0;32m" + time.Now().Format("15:04:05.9999999") + " " + output.content + "\x1B[0m")
+			color.Green(time.Now().Format("15:04:05.9999999") + " " + output.content)
 		} else if output.level == Debug {
-			fmt.Println("\x1B[0;34m" + time.Now().Format("15:04:05.9999999") + " " + output.content + "\x1B[0m")
+			color.Blue(time.Now().Format("15:04:05.9999999") + " " + output.content)
 		} else if output.level == Warning {
-			fmt.Println("\x1B[0;33m" + time.Now().Format("15:04:05.9999999") + " " + output.content + "\x1B[0m")
+			color.Yellow(time.Now().Format("15:04:05.9999999") + " " + output.content)
 		} else if output.level == Error {
-			fmt.Println("\x1B[0;31m" + time.Now().Format("15:04:05.9999999") + " " + output.content + "\x1B[0m")
+			color.Red(time.Now().Format("15:04:05.9999999") + " " + output.content)
 		}
 	}
 	if l.config.OutputType&File == File {

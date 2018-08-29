@@ -12,117 +12,82 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package app
+package config
 
 import (
-	"io/ioutil"
 	"github.com/snippetor/bingo/errors"
 	"github.com/robertkrimen/otto"
+	"io/ioutil"
 	"github.com/snippetor/bingo/log"
 )
 
-type Service struct {
-	Net   string
-	Port  int
-	Codec string
-}
-
-type DBConfig struct {
-	Type     string
-	Addr     string
-	User     string
-	Pwd      string
-	Db       string
-	TbPrefix string
-}
-
-type AppConfig struct {
-	Name    string
-	Package string
-	Etds    []string
-	Service []*Service
-	RpcPort int
-	RpcTo   []string
-	Logs    map[string]*log.Config
-	Db      []*DBConfig
-	Config  map[string]interface{}
-}
-
-type BingoConfig struct {
-	Apps []*AppConfig
-}
-
-var (
-	bingoConfig *BingoConfig
-)
-
-func BingoConfiguration() *BingoConfig {
-	return bingoConfig
+type JsParser struct {
 }
 
 // 解析配置文件
-func parse(configPath string) {
+func (p *JsParser) Parse(configPath string) *BingoConfig {
 	content, err := ioutil.ReadFile(configPath)
 	errors.Check(err)
 	o := otto.New()
 	_, err = o.Run(content)
 	errors.Check(err)
 
-	bingoConfig = &BingoConfig{}
+	bingoConfig := &BingoConfig{}
 	apps, err := o.Get("apps")
 	errors.Check(err)
 	for _, name := range apps.Object().Keys() {
 		app, err := apps.Object().Get(name)
 		errors.Check(err)
-		bingoConfig.Apps = append(bingoConfig.Apps, parseApp(name, app.Object()))
+		bingoConfig.Apps = append(bingoConfig.Apps, p.parseApp(name, app.Object()))
 	}
+	return bingoConfig
 }
 
-func parseApp(name string, v *otto.Object) *AppConfig {
+func (p *JsParser) parseApp(name string, v *otto.Object) *AppConfig {
 	app := &AppConfig{Name: name}
 	// Package
-	app.Package = parseString("package", v)
+	app.Package = p.parseString("package", v)
 	// etds
-	app.Etds = parseStrings("etds", v)
+	app.Etds = p.parseStrings("etds", v)
 	// Service []*Service
-	service := parseObjects("service", v)
+	service := p.parseObjects("service", v)
 	for _, v := range service {
 		app.Service = append(app.Service, &Service{
-			Net:   parseString("net", v),
-			Port:  int(parseInt("net", v)),
-			Codec: parseStringMust("codec", v, "protobuf"),
+			Net:   p.parseString("net", v),
+			Port:  int(p.parseInt("net", v)),
+			Codec: p.parseStringMust("codec", v, "protobuf"),
 		})
 	}
 	// RpcPort int
-	app.RpcPort = int(parseInt("rpcPort", v))
+	app.RpcPort = int(p.parseInt("rpcPort", v))
 	// RpcTo   []string
-	app.RpcTo = parseStrings("rpcPort", v)
+	app.RpcTo = p.parseStrings("rpcPort", v)
 	// Logs  map[string]*LogConfig
-	m := parseStringMap("logs", v)
+	m := p.parseStringMap("logs", v)
 	app.Logs = make(map[string]*log.Config)
 	for k, v := range m {
 		app.Logs[k] = &log.Config{
-			Level:              log.Level(mustInt(v, int64(log.Info))),
-			OutputType:         log.OutputType(mustInt(v, int64(log.Console))),
-			LogFileRollingType: log.RollingType(mustInt(v, int64(log.RollingNone))),
-			LogFileOutputDir:   mustString(v, "."),
-			LogFileMaxSize:     mustInt(v, 1*log.GB),
+			Level:              log.Level(p.mustInt(v, int64(log.Info))),
+			OutputType:         log.OutputType(p.mustInt(v, int64(log.Console))),
+			LogFileRollingType: log.RollingType(p.mustInt(v, int64(log.RollingNone))),
+			LogFileOutputDir:   p.mustString(v, "."),
+			LogFileMaxSize:     p.mustInt(v, 1*log.GB),
 		}
 	}
 	// Db      []*DBConfig
-	dbs := parseObjects("db", v)
+	dbs := p.parseObjects("db", v)
 	for _, v := range dbs {
 		app.Db = append(app.Db, &DBConfig{
-			Type:     parseString("type", v),
-			Addr:     parseString("addr", v),
-			User:     parseStringMust("user", v, ""),
-			Pwd:      parseStringMust("pwd", v, ""),
-			Db:       parseStringMust("db", v, ""),
-			TbPrefix: parseStringMust("tbPrefix", v, ""),
+			Type:     p.parseString("type", v),
+			Addr:     p.parseString("addr", v),
+			User:     p.parseStringMust("user", v, ""),
+			Pwd:      p.parseStringMust("pwd", v, ""),
+			Db:       p.parseStringMust("db", v, ""),
+			TbPrefix: p.parseStringMust("tbPrefix", v, ""),
 		})
 	}
 	// config
-	m = parseStringMap("config", v)
+	m = p.parseStringMap("config", v)
 	app.Config = make(map[string]interface{})
 	for k, v := range m {
 		i, err := v.Export()
@@ -132,7 +97,7 @@ func parseApp(name string, v *otto.Object) *AppConfig {
 	return app
 }
 
-func parseStringMap(tag string, v *otto.Object) map[string]otto.Value {
+func (p *JsParser) parseStringMap(tag string, v *otto.Object) map[string]otto.Value {
 	t, err := v.Get(tag)
 	errors.Check(err)
 	if !t.IsObject() {
@@ -147,7 +112,7 @@ func parseStringMap(tag string, v *otto.Object) map[string]otto.Value {
 	return m
 }
 
-func parseObjects(tag string, v *otto.Object) []*otto.Object {
+func (p *JsParser) parseObjects(tag string, v *otto.Object) []*otto.Object {
 	t, err := v.Get(tag)
 	errors.Check(err)
 	if !t.IsObject() {
@@ -164,7 +129,7 @@ func parseObjects(tag string, v *otto.Object) []*otto.Object {
 	}
 }
 
-func parseStrings(tag string, v *otto.Object) []string {
+func (p *JsParser) parseStrings(tag string, v *otto.Object) []string {
 	t, err := v.Get(tag)
 	errors.Check(err)
 	if !t.IsObject() {
@@ -181,7 +146,7 @@ func parseStrings(tag string, v *otto.Object) []string {
 	}
 }
 
-func parseString(tag string, v *otto.Object) string {
+func (p *JsParser) parseString(tag string, v *otto.Object) string {
 	t, err := v.Get(tag)
 	errors.Check(err)
 	if !t.IsString() {
@@ -192,15 +157,15 @@ func parseString(tag string, v *otto.Object) string {
 	return str
 }
 
-func parseStringMust(tag string, v *otto.Object, defValue string) string {
+func (p *JsParser) parseStringMust(tag string, v *otto.Object, defValue string) string {
 	t, err := v.Get(tag)
 	if err != nil {
 		return defValue
 	}
-	return mustString(t, defValue)
+	return p.mustString(t, defValue)
 }
 
-func parseInt(tag string, v *otto.Object) int64 {
+func (p *JsParser) parseInt(tag string, v *otto.Object) int64 {
 	t, err := v.Get(tag)
 	errors.Check(err)
 	if !t.IsNumber() {
@@ -211,15 +176,15 @@ func parseInt(tag string, v *otto.Object) int64 {
 	return i
 }
 
-func parseIntMust(tag string, v *otto.Object, defValue int64) int64 {
+func (p *JsParser) parseIntMust(tag string, v *otto.Object, defValue int64) int64 {
 	t, err := v.Get(tag)
 	if err != nil {
 		return defValue
 	}
-	return mustInt(t, defValue)
+	return p.mustInt(t, defValue)
 }
 
-func mustString(v otto.Value, defValue string) string {
+func (p *JsParser) mustString(v otto.Value, defValue string) string {
 	if !v.IsString() {
 		return defValue
 	}
@@ -230,7 +195,7 @@ func mustString(v otto.Value, defValue string) string {
 	return i
 }
 
-func mustInt(v otto.Value, defValue int64) int64 {
+func (p *JsParser) mustInt(v otto.Value, defValue int64) int64 {
 	if !v.IsNumber() {
 		return defValue
 	}
@@ -239,13 +204,4 @@ func mustInt(v otto.Value, defValue int64) int64 {
 		return defValue
 	}
 	return i
-}
-
-func findApp(name string) *AppConfig {
-	for _, n := range bingoConfig.Apps {
-		if n.Name == name {
-			return n
-		}
-	}
-	return nil
 }

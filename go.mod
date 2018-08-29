@@ -6,6 +6,7 @@ require (
 	github.com/dustin/go-humanize v0.0.0-20180713052910-9f541cc9db5d // indirect
 	github.com/robertkrimen/otto v0.0.0-20180617131154-15f95af6e78d // indirect
 	github.com/smallnest/rpcx v0.0.0-20180827063508-e9348955605f // indirect
+	github.com/urfave/cli v1.20.0 // indirect
 	gopkg.in/sourcemap.v1 v1.0.5 // indirect
 )
 

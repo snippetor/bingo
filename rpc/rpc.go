@@ -30,14 +30,14 @@ import (
 )
 
 type Server struct {
-	name    string
 	appName string
+	pkg     string
 	serv    *server.Server
 }
 
-func (s *Server) Listen(name, appName string, port int, etcdAddrs []string, onInit func(server *Server)) {
-	s.name = name
+func (s *Server) Listen(appName, pkg string, port int, etcdAddrs []string, onInit func(server *Server)) {
 	s.appName = appName
+	s.pkg = pkg
 	s.serv = server.NewServer()
 	go func() {
 		r := &serverplugin.EtcdRegisterPlugin{
@@ -62,7 +62,7 @@ func (s *Server) Listen(name, appName string, port int, etcdAddrs []string, onIn
 }
 
 func (s *Server) RegisterFunction(name string, fn interface{}) {
-	s.serv.RegisterFunctionName(s.appName, name, fn, "")
+	s.serv.RegisterFunctionName(s.pkg, name, fn, "")
 }
 
 func (s *Server) Close() {
@@ -72,16 +72,16 @@ func (s *Server) Close() {
 }
 
 type Client struct {
-	name          string
 	appName       string
+	pkg           string
 	addr          string
 	ServerAppName string
 	client        client.XClient
 }
 
-func (c *Client) Connect(name, appName, serverAppName string, etcdAddrs []string) {
-	c.name = name
+func (c *Client) Connect(appName, pkg, serverAppName string, etcdAddrs []string) {
 	c.appName = appName
+	c.pkg = pkg
 	c.ServerAppName = serverAppName
 	d := client.NewEtcdDiscovery("bingo", serverAppName, etcdAddrs, nil)
 	var option = client.DefaultOption

@@ -17,7 +17,7 @@ func Run(app, env string) {
 
 	appConfig := bingoConfig.FindApp(app)
 	if appConfig == nil {
-		printError("Error: Not found app by name '%s'.", app)
+		printError("Error: Not found app by name '%s' in '%s'.", app, name)
 		return
 	}
 }

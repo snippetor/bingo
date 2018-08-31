@@ -2,6 +2,7 @@ package command
 
 import (
 	"io/ioutil"
+	"github.com/snippetor/bingo/utils"
 )
 
 var template = `/**
@@ -32,6 +33,9 @@ Http = "http";
 Kcp = "kcp";
 Tcp = "tcp";
 Websocket = "ws";
+// 数据库
+MySql = "mysql";
+Mongo = "mongo";
 
 /**
  * 全局配置
@@ -47,14 +51,14 @@ config = {
  * apps.app1 = {
  *   package: "app",
  *   etcds: [],
- *   service: [
- *      { net: "http", port: 8080, codec: "json" },
- *      { net: "kcp", port: 9090 },
- *      { net: "tcp", port: 9091 },
- *      { net: "ws", port: 9092 },
- *   ],
- *   rpcPort: 0,            //
- *   rpcTo: ["app2"],       //
+ *   service: {
+ *      http8080: { net: "http", port: 8080, codec: "json" },
+ *      kcp9090: { net: "kcp", port: 9090 },
+ *      tcp9091: { net: "tcp", port: 9091 },
+ *      ws9092: { net: "ws", port: 9092 },
+ *   },
+ *   rpcPort: 0,           
+ *   rpcTo: ["app2"],      
  *   logs: {
  *       default: {
  *           level: LevelInfo,
@@ -64,15 +68,15 @@ config = {
  *           fileMaxSize: 500*MB
  *       },
  *   },
- *   db: [
- *      {
+ *   db: {
+ *      mongo1: {
  *          type: "mongo"
  *          addr: "localhost:27017"
  *          user: "",
  *          pwd: "",
  *          db: "test",
  *      },
- *      {
+ *      mysql1: {
  *          type: "mysql"
  *          addr: "localhost:27017"
  *          user: "",
@@ -80,7 +84,7 @@ config = {
  *          db: "test",
  *          tbPrefix: "tb"
  *      }
- *   ],
+ *   },
  *   config: {}
  *  }
  *  @app1: 为app唯一名称，可自定义，并在运行时作为进程名，日志名称也使用它
@@ -104,15 +108,18 @@ config = {
  */
 apps = {};
 `
-
 func Init(env string) {
 	var name string
 	if env == "" {
-		name = "bingo.js"
+		name = ".bingo.js"
 	} else {
-		name = "bingo." + env + ".js"
+		name = ".bingo." + env + ".js"
 	}
-	printInfo("Bingo init config file '%s'... ", name)
+	if utils.IsFileExists(name) {
+		printError("Bingo init failed, %s is exists.", name)
+		return
+	}
+	printInfo("Bingo init config file %s... ", name)
 	ioutil.WriteFile(name, []byte(template), 0666)
 	printSuccess("Bingo init Done!")
 }

@@ -2,6 +2,10 @@ package command
 
 import "github.com/fatih/color"
 
+func print(format string, v ...interface{}) {
+	color.Magenta(format, v...)
+}
+
 func printInfo(format string, v ...interface{}) {
 	color.Blue(format, v...)
 }

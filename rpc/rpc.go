@@ -79,14 +79,14 @@ type Client struct {
 	client        client.XClient
 }
 
-func (c *Client) Connect(appName, pkg, serverAppName string, etcdAddrs []string) {
+func (c *Client) Connect(appName, pkg, serverPkg string, etcdAddrs []string) {
 	c.appName = appName
 	c.pkg = pkg
-	c.ServerAppName = serverAppName
-	d := client.NewEtcdDiscovery("bingo", serverAppName, etcdAddrs, nil)
+	c.ServerAppName = serverPkg
+	d := client.NewEtcdDiscovery("bingo", serverPkg, etcdAddrs, nil)
 	var option = client.DefaultOption
 	option.SerializeType = protocol.SerializeNone
-	c.client = client.NewXClient(serverAppName, client.Failtry, client.RoundRobin, d, option)
+	c.client = client.NewXClient(serverPkg, client.Failtry, client.RoundRobin, d, option)
 }
 
 func (c *Client) Call(method string, args interface{}, reply interface{}) error {

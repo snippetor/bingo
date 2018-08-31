@@ -24,14 +24,16 @@ import (
 	"strconv"
 	"github.com/valyala/fasthttp"
 	"github.com/snippetor/bingo/middleware/latency"
-	"os"
-	"path"
 	"github.com/snippetor/bingo/middleware/recover"
 	"github.com/snippetor/bingo/mvc"
 	"github.com/snippetor/bingo/rpc"
 	"github.com/snippetor/bingo/net"
 	"github.com/snippetor/bingo/codec"
 	context2 "context"
+	"github.com/snippetor/bingo/config"
+	"flag"
+	"os"
+	"path/filepath"
 	"fmt"
 )
 
@@ -60,6 +62,11 @@ type Application interface {
 	RpcCtxPool() *Pool
 	ServiceCtxPool() *Pool
 	WebApiCtxPool() *Pool
+
+	// 系统配置
+	BingoConfig() *config.BingoConfig
+	// 获取运行环境
+	Env() string
 }
 
 var _ Application = (*application)(nil)
@@ -78,15 +85,39 @@ type application struct {
 
 	globalMiddleWares Handlers
 	endRunning        chan bool
+
+	bingoConfig *config.BingoConfig
+	env         string
 }
 
+var (
+	n = flag.String("n", "", "app name")
+	e = flag.String("e", "", "env")
+)
+
 func New() Application {
-	wd, _ := os.Getwd()
+	flag.Parse()
+
+	var appName string
+	if n == nil {
+		appName = strings.TrimSuffix(filepath.Base(os.Args[0]), filepath.Ext(os.Args[0]))
+	} else {
+		appName = *n
+	}
+
+	var env string
+	if e == nil {
+		env = ""
+	} else {
+		env = *e
+	}
+
 	a := &application{
 		name:          appName,
 		modules:       make(map[string]module.Module),
 		defaultRouter: NewRouter(),
 		endRunning:    make(chan bool, 1),
+		env:           env,
 	}
 	a.rpcCtxPool = NewPool(func() Context {
 		return &RpcContext{
@@ -103,16 +134,23 @@ func New() Application {
 			Context: NewContext(a),
 		}
 	})
-
-	parse(configFilePath)
-	return NewWithConfig(appName, path.Join(wd, "bingo.yaml"))
+	return a
 }
 
 func (a *application) Run() {
-	appConfig := findApp(a.name)
+	var fileName string
+	if a.env == "" {
+		fileName = ".bingo.js"
+	} else {
+		fileName = ".bingo." + a.env + ".js"
+	}
+	// 解析配置文件
+	p := config.JsParser{}
+	a.bingoConfig = p.Parse(fileName)
+	// 找到app配置
+	appConfig := a.bingoConfig.FindApp(a.name)
 	if appConfig == nil {
-		fmt.Errorf("run app failed! not found app config by name %s ", a.name)
-		return
+		panic(fmt.Sprintf("run app failed! not found app config by fileName %s ", a.name))
 	}
 	// log
 	loggers := module.Loggers{}
@@ -132,12 +170,21 @@ func (a *application) Run() {
 	// middleware
 	a.Use(recover.New(), latency.New())
 	// db
-	for _, c := range appConfig.Db {
-		if c.Type == "mongo" {
-			a.AddModule(module.NewMongoModule(c.Addr, c.User, c.Pwd, c.Db))
-		} else if c.Type == "mysql" {
-			a.AddModule(module.NewMysqlModule(c.Addr, c.User, c.Pwd, c.Db, c.TbPrefix))
+	mongoes := make(map[string]module.MongoDB)
+	mysqls := make(map[string]module.MySqlDB)
+	for k, c := range appConfig.Db {
+		switch strings.ToLower(c.Type) {
+		case "mongo":
+			mongoes[k] = module.NewMongoDB(c.Addr, c.User, c.Pwd, c.Db)
+		case "mysql":
+			mysqls[k] = module.NewMysqlDB(c.Addr, c.User, c.Pwd, c.Db, c.TbPrefix)
 		}
+	}
+	if len(mongoes) > 0 {
+		a.AddModule(module.NewMongoModule(mongoes))
+	}
+	if len(mysqls) > 0 {
+		a.AddModule(module.NewMysqlModule(mysqls))
 	}
 	// init mvc objects
 	for _, obj := range a.mvcObjs {
@@ -151,9 +198,9 @@ func (a *application) Run() {
 	}
 	// rpc
 	var rpcServer *rpc.Server
-	if appConfig.Rpc.Port > 0 {
+	if appConfig.RpcPort > 0 {
 		rpcServer = &rpc.Server{}
-		rpcServer.Listen(appConfig.Name, appConfig.ModelName, appConfig.Rpc.Port, []string{}, func(server *rpc.Server) {
+		rpcServer.Listen(appConfig.Name, appConfig.Package, appConfig.RpcPort, appConfig.Etds, func(server *rpc.Server) {
 			for key := range a.defaultRouter.Handlers("RPC") {
 				server.RegisterFunction(key, func(c context2.Context, args []byte, reply *[]byte) error {
 					ctx := a.RpcCtxPool().Acquire().(*RpcContext)
@@ -167,18 +214,15 @@ func (a *application) Run() {
 		})
 	}
 	var rpcClients []*rpc.Client
-	for _, serverName := range appConfig.Rpc.To {
+	for _, serverPkg := range appConfig.RpcTo {
 		c := &rpc.Client{}
-		serverApp := findApp(serverName)
-		if serverApp != nil {
-			c.Connect(appConfig.Name, appConfig.ModelName, BingoConfiguration().Domains[serverApp.Domain]+":"+strconv.Itoa(serverApp.Rpc.Port), []string{})
-			rpcClients = append(rpcClients, c)
-		}
+		c.Connect(appConfig.Name, appConfig.Package, serverPkg, appConfig.Etds)
+		rpcClients = append(rpcClients, c)
 	}
 	a.AddModule(module.NewRPCModule(appConfig.Name, rpcClients, rpcServer))
 	// service
 	services := module.Services{}
-	for _, s := range appConfig.Services {
+	for _, s := range appConfig.Service {
 		var c codec.Codec
 		if strings.ToLower(s.Codec) == "json" {
 			c = codec.NewCodec(codec.Json)
@@ -187,7 +231,7 @@ func (a *application) Run() {
 		} else {
 			c = codec.NewCodec(codec.Json)
 		}
-		switch strings.ToLower(s.Type) {
+		switch strings.ToLower(s.Net) {
 		case "tcp":
 			serv := net.GoListen(net.Tcp, s.Port, func(conn net.Conn, msgId net.MessageId, body net.MessageBody) {
 				ctx := a.ServiceCtxPool().Acquire().(*ServiceContext)
@@ -216,6 +260,8 @@ func (a *application) Run() {
 				a.defaultRouter.OnHandleRequest(ctx)
 			})
 			services[s.Name] = serv
+		case "kcp":
+
 		case "http":
 			go func() {
 				fwlogger.D("-- http service start on %s --", strconv.Itoa(s.Port))
@@ -327,6 +373,14 @@ func (a *application) ServiceCtxPool() *Pool {
 
 func (a *application) WebApiCtxPool() *Pool {
 	return a.webApiCtxPool
+}
+
+func (a *application) BingoConfig() *config.BingoConfig {
+	return a.bingoConfig
+}
+
+func (a *application) Env() string {
+	return a.env
 }
 
 func (a *application) Destroy() {

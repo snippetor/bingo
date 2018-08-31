@@ -37,16 +37,21 @@ type AppConfig struct {
 	Name    string
 	Package string
 	Etds    []string
-	Service []*Service
+	Service map[string]*Service
 	RpcPort int
 	RpcTo   []string
 	Logs    map[string]*log.Config
-	Db      []*DBConfig
+	Db      map[string]*DBConfig
 	Config  map[string]interface{}
 }
 
+type GlobalConfig struct {
+	EnableBingoLog bool
+}
+
 type BingoConfig struct {
-	Apps []*AppConfig
+	Apps   []*AppConfig
+	Config *GlobalConfig
 }
 
 type Parser interface {

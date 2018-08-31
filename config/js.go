@@ -33,6 +33,12 @@ func (p *JsParser) Parse(configPath string) *BingoConfig {
 	errors.Check(err)
 
 	bingoConfig := &BingoConfig{}
+	config, err := o.Get("config")
+	errors.Check(err)
+	if !config.IsObject() {
+		panic("Parse config file failed, 'config' must be object.")
+	}
+	bingoConfig.Config = p.parseGlobalConfig(config.Object())
 	apps, err := o.Get("apps")
 	errors.Check(err)
 	for _, name := range apps.Object().Keys() {
@@ -43,25 +49,34 @@ func (p *JsParser) Parse(configPath string) *BingoConfig {
 	return bingoConfig
 }
 
+func (p *JsParser) parseGlobalConfig(v *otto.Object) *GlobalConfig {
+	return &GlobalConfig{
+		EnableBingoLog: p.parseBoolMust("enableBingoLog", v, false),
+	}
+}
+
 func (p *JsParser) parseApp(name string, v *otto.Object) *AppConfig {
 	app := &AppConfig{Name: name}
 	// Package
 	app.Package = p.parseString("package", v)
 	// etds
-	app.Etds = p.parseStrings("etds", v)
-	// Service []*Service
+	app.Etds = p.parseStrings("etcds", v)
+	// Service map[string]*Service
 	service := p.parseObjects("service", v)
-	for _, v := range service {
-		app.Service = append(app.Service, &Service{
-			Net:   p.parseString("net", v),
-			Port:  int(p.parseInt("net", v)),
-			Codec: p.parseStringMust("codec", v, "protobuf"),
-		})
+	app.Service = make(map[string]*Service)
+	for k, v := range service {
+		if m, ok := v.(map[string]interface{}); ok {
+			app.Service[k] = &Service{
+				Net:   p.parseIString("service.net", m["net"]),
+				Port:  int(p.parseIInt("service.port", m["port"])),
+				Codec: p.parseIStringMust("service.codec", m["codec"], "protobuf"),
+			}
+		}
 	}
 	// RpcPort int
 	app.RpcPort = int(p.parseInt("rpcPort", v))
 	// RpcTo   []string
-	app.RpcTo = p.parseStrings("rpcPort", v)
+	app.RpcTo = p.parseStrings("rpcTo", v)
 	// Logs  map[string]*LogConfig
 	m := p.parseStringMap("logs", v)
 	app.Logs = make(map[string]*log.Config)
@@ -74,17 +89,20 @@ func (p *JsParser) parseApp(name string, v *otto.Object) *AppConfig {
 			LogFileMaxSize:     p.mustInt(v, 1*log.GB),
 		}
 	}
-	// Db      []*DBConfig
+	// Db      map[string]*DBConfig
 	dbs := p.parseObjects("db", v)
-	for _, v := range dbs {
-		app.Db = append(app.Db, &DBConfig{
-			Type:     p.parseString("type", v),
-			Addr:     p.parseString("addr", v),
-			User:     p.parseStringMust("user", v, ""),
-			Pwd:      p.parseStringMust("pwd", v, ""),
-			Db:       p.parseStringMust("db", v, ""),
-			TbPrefix: p.parseStringMust("tbPrefix", v, ""),
-		})
+	app.Db = make(map[string]*DBConfig)
+	for k, v := range dbs {
+		if m, ok := v.(map[string]interface{}); ok {
+			app.Db[k] = &DBConfig{
+				Type:     p.parseIString("dbs.type", m["type"]),
+				Addr:     p.parseIString("dbs.addr", m["addr"]),
+				User:     p.parseIStringMust("dbs.user", m["user"], ""),
+				Pwd:      p.parseIStringMust("dbs.pwd", m["pwd"], ""),
+				Db:       p.parseIStringMust("dbs.db", m["db"], ""),
+				TbPrefix: p.parseIStringMust("dbs.tbPrefix", m["tbPrefix"], ""),
+			}
+		}
 	}
 	// config
 	m = p.parseStringMap("config", v)
@@ -112,7 +130,7 @@ func (p *JsParser) parseStringMap(tag string, v *otto.Object) map[string]otto.Va
 	return m
 }
 
-func (p *JsParser) parseObjects(tag string, v *otto.Object) []*otto.Object {
+func (p *JsParser) parseObjects(tag string, v *otto.Object) map[string]interface{} {
 	t, err := v.Get(tag)
 	errors.Check(err)
 	if !t.IsObject() {
@@ -121,7 +139,12 @@ func (p *JsParser) parseObjects(tag string, v *otto.Object) []*otto.Object {
 	if i, err := t.Export(); err != nil {
 		panic("Parse config file failed, 'app." + tag + "' must be object array.")
 	} else {
-		if array, ok := i.([]*otto.Object); !ok {
+		if array, ok := i.(map[string]interface{}); !ok {
+			if _, ok := i.([]interface{}); !ok {
+				panic("Parse config file failed, 'app." + tag + "' must be object array.")
+			} else {
+				return map[string]interface{}{}
+			}
 			panic("Parse config file failed, 'app." + tag + "' must be object array.")
 		} else {
 			return array
@@ -139,7 +162,19 @@ func (p *JsParser) parseStrings(tag string, v *otto.Object) []string {
 		panic("Parse config file failed, 'app." + tag + "' must be string array.")
 	} else {
 		if array, ok := i.([]string); !ok {
-			panic("Parse config file failed, 'app." + tag + "' must be string array.")
+			if a, ok := i.([]interface{}); !ok {
+				panic("Parse config file failed, 'app." + tag + "' must be string array.")
+			} else {
+				var strArray []string
+				for _, s := range a {
+					if str, ok := s.(string); !ok {
+						panic("Parse config file failed, 'app." + tag + "' must be string array.")
+					} else {
+						strArray = append(strArray, str)
+					}
+				}
+				return strArray
+			}
 		} else {
 			return array
 		}
@@ -157,12 +192,28 @@ func (p *JsParser) parseString(tag string, v *otto.Object) string {
 	return str
 }
 
+func (p *JsParser) parseIString(tag string, v interface{}) string {
+	if str, ok := v.(string); ok {
+		return str
+	} else {
+		panic("Parse config file failed, 'app." + tag + "' must be string.")
+	}
+}
+
 func (p *JsParser) parseStringMust(tag string, v *otto.Object, defValue string) string {
 	t, err := v.Get(tag)
 	if err != nil {
 		return defValue
 	}
 	return p.mustString(t, defValue)
+}
+
+func (p *JsParser) parseIStringMust(tag string, v interface{}, defValue string) string {
+	if str, ok := v.(string); ok {
+		return str
+	} else {
+		return defValue
+	}
 }
 
 func (p *JsParser) parseInt(tag string, v *otto.Object) int64 {
@@ -176,12 +227,28 @@ func (p *JsParser) parseInt(tag string, v *otto.Object) int64 {
 	return i
 }
 
+func (p *JsParser) parseIInt(tag string, v interface{}) int64 {
+	if str, ok := v.(int64); ok {
+		return str
+	} else {
+		panic("Parse config file failed, 'app." + tag + "' must be int.")
+	}
+}
+
 func (p *JsParser) parseIntMust(tag string, v *otto.Object, defValue int64) int64 {
 	t, err := v.Get(tag)
 	if err != nil {
 		return defValue
 	}
 	return p.mustInt(t, defValue)
+}
+
+func (p *JsParser) parseBoolMust(tag string, v *otto.Object, defValue bool) bool {
+	t, err := v.Get(tag)
+	if err != nil {
+		return defValue
+	}
+	return p.mustBool(t, defValue)
 }
 
 func (p *JsParser) mustString(v otto.Value, defValue string) string {
@@ -200,6 +267,17 @@ func (p *JsParser) mustInt(v otto.Value, defValue int64) int64 {
 		return defValue
 	}
 	i, err := v.ToInteger()
+	if err != nil {
+		return defValue
+	}
+	return i
+}
+
+func (p *JsParser) mustBool(v otto.Value, defValue bool) bool {
+	if !v.IsBoolean() {
+		return defValue
+	}
+	i, err := v.ToBoolean()
 	if err != nil {
 		return defValue
 	}

@@ -9,7 +9,43 @@ import (
 // mysql
 type MySqlModule interface {
 	Module
-	DB() *gorm.DB
+	DefaultDB() MySqlDB
+	DB(name string) MySqlDB
+}
+
+func NewMysqlModule(dbs map[string]MySqlDB) MySqlModule {
+	return &mysqlModule{dbs}
+}
+
+type mysqlModule struct {
+	dbs map[string]MySqlDB
+}
+
+func (m *mysqlModule) DefaultDB() MySqlDB {
+	if db, ok := m.dbs["default"]; ok {
+		return db
+	}
+	for _, v := range m.dbs {
+		return v
+	}
+	return nil
+}
+
+func (m *mysqlModule) DB(name string) MySqlDB {
+	if db, ok := m.dbs[name]; ok {
+		return db
+	}
+	return nil
+}
+
+func (m *mysqlModule) Close() {
+	for _, v := range m.dbs {
+		v.Close()
+	}
+}
+
+type MySqlDB interface {
+	OrmDB() *gorm.DB
 	TableName(tbName string) string
 	AutoMigrate(model interface{})
 
@@ -20,20 +56,21 @@ type MySqlModule interface {
 	Begin() *gorm.DB
 	Rollback()
 	Commit()
+	Close()
 }
 
-type mysqlModule struct {
-	db       *gorm.DB
+type mysqlDB struct {
 	tbPrefix string
+	db       *gorm.DB
 }
 
-func NewMysqlModule(addr, username, pwd, defaultDb, tbPrefix string) MySqlModule {
-	m := &mysqlModule{tbPrefix: tbPrefix}
+func NewMysqlDB(addr, username, pwd, defaultDb, tbPrefix string) MySqlDB {
+	m := &mysqlDB{tbPrefix: tbPrefix}
 	m.dial(addr, username, pwd, defaultDb)
 	return m
 }
 
-func (m *mysqlModule) dial(addr, username, pwd, defaultDb string) {
+func (m *mysqlDB) dial(addr, username, pwd, defaultDb string) {
 	// db
 	db, err := gorm.Open("mysql", username+":"+pwd+"@tcp("+addr+")/"+defaultDb+"?charset=utf8&parseTime=True&loc=Local")
 	errors.Check(err)
@@ -44,62 +81,62 @@ func (m *mysqlModule) dial(addr, username, pwd, defaultDb string) {
 	//db.LogMode(true)
 }
 
-func (m *mysqlModule) DB() *gorm.DB {
+func (m *mysqlDB) OrmDB() *gorm.DB {
 	if m.db == nil {
 		panic("- DB not be initialized, invoke InitDB at first!")
 	}
 	return m.db
 }
 
-func (m *mysqlModule) TableName(tbName string) string {
+func (m *mysqlDB) TableName(tbName string) string {
 	if m.tbPrefix != "" {
 		return m.tbPrefix + "_" + tbName
 	}
 	return tbName
 }
 
-func (m *mysqlModule) AutoMigrate(model interface{}) {
+func (m *mysqlDB) AutoMigrate(model interface{}) {
 	if mod, ok := model.(interface {
 		Init(*gorm.DB, interface{})
 	}); ok {
 		mod.Init(m.db, model)
 	}
-	m.DB().AutoMigrate(model)
+	m.OrmDB().AutoMigrate(model)
 }
 
-func (m *mysqlModule) Create(model interface{}) bool {
+func (m *mysqlDB) Create(model interface{}) bool {
 	if mod, ok := model.(interface {
 		Init(*gorm.DB, interface{})
 	}); ok {
 		mod.Init(m.db, model)
 	}
-	res := m.DB().Create(model)
+	res := m.OrmDB().Create(model)
 	if res.Error != nil {
 		panic(res.Error)
 	}
 	return true
 }
 
-func (m *mysqlModule) Find(model interface{}) bool {
+func (m *mysqlDB) Find(model interface{}) bool {
 	if mod, ok := model.(interface {
 		Init(*gorm.DB, interface{})
 	}); ok {
 		mod.Init(m.db, model)
 	}
-	res := m.DB().Where(model).First(model)
+	res := m.OrmDB().Where(model).First(model)
 	return res.Error == nil
 }
 
-func (m *mysqlModule) FindAll(models interface{}) bool {
-	res := m.DB().Find(models)
+func (m *mysqlDB) FindAll(models interface{}) bool {
+	res := m.OrmDB().Find(models)
 	if res.Error != nil {
 		panic(res.Error)
 	}
 	return true
 }
 
-func (m *mysqlModule) FindMany(models interface{}, limit int, orderBy string, whereAndArgs ... interface{}) bool {
-	db := m.DB()
+func (m *mysqlDB) FindMany(models interface{}, limit int, orderBy string, whereAndArgs ... interface{}) bool {
+	db := m.OrmDB()
 	if limit > 0 {
 		db = db.Limit(limit)
 	}
@@ -120,19 +157,19 @@ func (m *mysqlModule) FindMany(models interface{}, limit int, orderBy string, wh
 	return true
 }
 
-func (m *mysqlModule) Begin() *gorm.DB {
-	return m.DB().Begin()
+func (m *mysqlDB) Begin() *gorm.DB {
+	return m.OrmDB().Begin()
 }
 
-func (m *mysqlModule) Rollback() {
-	m.DB().Rollback()
+func (m *mysqlDB) Rollback() {
+	m.OrmDB().Rollback()
 }
 
-func (m *mysqlModule) Commit() {
-	m.DB().Rollback()
+func (m *mysqlDB) Commit() {
+	m.OrmDB().Rollback()
 }
 
-func (m *mysqlModule) Close() {
+func (m *mysqlDB) Close() {
 	if m.db != nil {
 		m.db.Close()
 	}

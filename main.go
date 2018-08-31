@@ -3,9 +3,8 @@ package main
 import (
 	"os"
 	"github.com/urfave/cli"
-	"log"
-	"sort"
 	"github.com/snippetor/bingo/command"
+	"sort"
 )
 
 func main() {
@@ -43,6 +42,20 @@ func main() {
 				return nil
 			},
 		},
+		{
+			Name:      "new",
+			Aliases:   []string{"n"},
+			Usage:     "new a app config",
+			UsageText: "bingo new [app package] [app name] [env]",
+			Action: func(c *cli.Context) error {
+				if c.NArg() == 2 {
+					command.New(c.Args()[0], c.Args()[1], "")
+				} else if c.NArg() == 3 {
+					command.New(c.Args()[0], c.Args()[1], c.Args()[2])
+				}
+				return nil
+			},
+		},
 	}
 
 	sort.Sort(cli.FlagsByName(app.Flags))
@@ -50,6 +63,6 @@ func main() {
 
 	err := app.Run(os.Args)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 }

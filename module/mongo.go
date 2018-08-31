@@ -11,25 +11,62 @@ import (
 // mongo
 type MongoModule interface {
 	Module
+	DefaultDB() MongoDB
+	DB(name string) MongoDB
+}
+
+func NewMongoModule(dbs map[string]MongoDB) MongoModule {
+	return &mongoModule{dbs}
+}
+
+type mongoModule struct {
+	dbs map[string]MongoDB
+}
+
+func (m *mongoModule) DefaultDB() MongoDB {
+	if db, ok := m.dbs["default"]; ok {
+		return db
+	}
+	for _, v := range m.dbs {
+		return v
+	}
+	return nil
+}
+
+func (m *mongoModule) DB(name string) MongoDB {
+	if db, ok := m.dbs[name]; ok {
+		return db
+	}
+	return nil
+}
+
+func (m *mongoModule) Close() {
+	for _, v := range m.dbs {
+		v.Close()
+	}
+}
+
+type MongoDB interface {
 	Session() *mgo.Session
 	Create(model interface{})
 	CreateMany(models interface{})
 	FindAll(models interface{})
 	FindMany(bson bson.M, models interface{})
 	Find(bson bson.M, model interface{})
+	Close()
 }
 
-type mongoModule struct {
-	session *mgo.Session
-}
-
-func NewMongoModule(addr, username, pwd, defaultDb string) MongoModule {
-	m := &mongoModule{}
+func NewMongoDB(addr, username, pwd, defaultDb string) MongoDB {
+	m := &mongoDB{}
 	m.dial(addr, username, pwd, defaultDb)
 	return m
 }
 
-func (m *mongoModule) dial(addr, user, pwd, defaultDb string) {
+type mongoDB struct {
+	session *mgo.Session
+}
+
+func (m *mongoDB) dial(addr, user, pwd, defaultDb string) {
 	//[mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]
 	//mongodb://myuser:mypass@localhost:40001,otherhost:40001/
 	session, err := mgo.DialWithInfo(&mgo.DialInfo{
@@ -45,11 +82,11 @@ func (m *mongoModule) dial(addr, user, pwd, defaultDb string) {
 }
 
 // must close session on transaction finish
-func (m *mongoModule) Session() *mgo.Session {
+func (m *mongoDB) Session() *mgo.Session {
 	return m.session.Copy()
 }
 
-func (m *mongoModule) Create(model interface{}) {
+func (m *mongoDB) Create(model interface{}) {
 	session := m.Session()
 	defer session.Close()
 	c := session.DB("").C(utils.StructName(model))
@@ -57,7 +94,7 @@ func (m *mongoModule) Create(model interface{}) {
 	errors.Check(err)
 }
 
-func (m *mongoModule) CreateMany(models interface{}) {
+func (m *mongoDB) CreateMany(models interface{}) {
 	session := m.Session()
 	defer session.Close()
 	c := session.DB("").C(utils.ElementName(models))
@@ -65,7 +102,7 @@ func (m *mongoModule) CreateMany(models interface{}) {
 	errors.Check(err)
 }
 
-func (m *mongoModule) FindAll(models interface{}) {
+func (m *mongoDB) FindAll(models interface{}) {
 	session := m.Session()
 	defer session.Close()
 	c := session.DB("").C(utils.ElementName(models))
@@ -73,7 +110,7 @@ func (m *mongoModule) FindAll(models interface{}) {
 	errors.Check(err)
 }
 
-func (m *mongoModule) FindMany(bson bson.M, models interface{}) {
+func (m *mongoDB) FindMany(bson bson.M, models interface{}) {
 	session := m.Session()
 	defer session.Close()
 	c := session.DB("").C(utils.ElementName(models))
@@ -81,7 +118,7 @@ func (m *mongoModule) FindMany(bson bson.M, models interface{}) {
 	errors.Check(err)
 }
 
-func (m *mongoModule) Find(bson bson.M, model interface{}) {
+func (m *mongoDB) Find(bson bson.M, model interface{}) {
 	session := m.Session()
 	defer session.Close()
 	c := session.DB("").C(utils.StructName(model))
@@ -89,7 +126,7 @@ func (m *mongoModule) Find(bson bson.M, model interface{}) {
 	errors.Check(err)
 }
 
-func (m *mongoModule) Close() {
+func (m *mongoDB) Close() {
 	if m.session != nil {
 		m.session.Close()
 	}

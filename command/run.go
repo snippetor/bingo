@@ -4,20 +4,19 @@ import (
 	"github.com/snippetor/bingo/config"
 )
 
-func Run(app, env string) {
-	printInfo("Bingo start running app '%s' ...", app)
+func Run(appName, env string) {
 	p := config.JsParser{}
 	var name string
 	if env == "" {
-		name = "bingo.js"
+		name = ".bingo.js"
 	} else {
-		name = "bing." + env + ".js"
+		name = ".bingo." + env + ".js"
 	}
 	bingoConfig := p.Parse(name)
-
-	appConfig := bingoConfig.FindApp(app)
+	appConfig := bingoConfig.FindApp(appName)
 	if appConfig == nil {
-		printError("Error: Not found app by name '%s' in '%s'.", app, name)
+		printError("Error: Not found app by name '%s' in '%s'.", appName, name)
 		return
 	}
+	watch(appConfig.Package, appName, env)
 }

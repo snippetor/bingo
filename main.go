@@ -56,6 +56,20 @@ func main() {
 				return nil
 			},
 		},
+		{
+			Name:      "build",
+			Aliases:   []string{"b"},
+			Usage:     "build bingo app",
+			UsageText: "bingo build [app name] [env]",
+			Action: func(c *cli.Context) error {
+				if c.NArg() == 2 {
+					command.New(c.Args()[0], c.Args()[1], "")
+				} else if c.NArg() == 3 {
+					command.New(c.Args()[0], c.Args()[1], c.Args()[2])
+				}
+				return nil
+			},
+		},
 	}
 
 	sort.Sort(cli.FlagsByName(app.Flags))

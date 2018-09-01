@@ -18,7 +18,6 @@ import (
 	"github.com/snippetor/bingo/utils"
 	"reflect"
 	"github.com/snippetor/bingo/module"
-	"github.com/snippetor/bingo/log/fwlogger"
 	"github.com/snippetor/bingo/log"
 	"strings"
 	"strconv"
@@ -43,7 +42,7 @@ type Application interface {
 	ShutDown()
 
 	// mvc objects
-	RegisterMVCObjects(...interface{})
+	RegisterController(...interface{})
 
 	// modules
 	AddModule(module.Module)
@@ -76,7 +75,7 @@ type application struct {
 	name          string
 	config        utils.ValueMap
 	modules       map[string]module.Module
-	mvcObjs       []interface{}
+	controllers   []interface{}
 	defaultRouter Router
 
 	rpcCtxPool     *Pool
@@ -187,13 +186,11 @@ func (a *application) Run() {
 		a.AddModule(module.NewMysqlModule(mysqls))
 	}
 	// init mvc objects
-	for _, obj := range a.mvcObjs {
+	for _, obj := range a.controllers {
 		if mvc.IsController(obj) {
 			builder := newRouterBuild(a.defaultRouter, obj)
 			obj.(mvc.Controller).Route(builder)
 			builder.Build()
-		} else if mvc.IsOrmModel(obj) {
-			a.MySql().AutoMigrate(obj.(mvc.MysqlOrmModel))
 		}
 	}
 	// rpc
@@ -222,7 +219,7 @@ func (a *application) Run() {
 	a.AddModule(module.NewRPCModule(appConfig.Name, rpcClients, rpcServer))
 	// service
 	services := module.Services{}
-	for _, s := range appConfig.Service {
+	for k, s := range appConfig.Service {
 		var c codec.Codec
 		if strings.ToLower(s.Codec) == "json" {
 			c = codec.NewCodec(codec.Json)
@@ -231,52 +228,50 @@ func (a *application) Run() {
 		} else {
 			c = codec.NewCodec(codec.Json)
 		}
-		switch strings.ToLower(s.Net) {
-		case "tcp":
-			serv := net.GoListen(net.Tcp, s.Port, func(conn net.Conn, msgId net.MessageId, body net.MessageBody) {
-				ctx := a.ServiceCtxPool().Acquire().(*ServiceContext)
-				defer a.ServiceCtxPool().Release(ctx)
-				ctx.Conn = conn
-				ctx.MessageId = msgId.MsgId()
-				ctx.MessageType = msgId.Type()
-				ctx.MessageGroup = msgId.Group()
-				ctx.MessageExtra = msgId.Extra()
-				ctx.MessageBody = &MessageBodyWrapper{RawContent: body, Codec: c}
-				ctx.Codec = c
-				a.defaultRouter.OnHandleRequest(ctx)
-			})
-			services[s.Name] = serv
-		case "ws":
-			serv := net.GoListen(net.WebSocket, s.Port, func(conn net.Conn, msgId net.MessageId, body net.MessageBody) {
-				ctx := a.ServiceCtxPool().Acquire().(*ServiceContext)
-				defer a.ServiceCtxPool().Release(ctx)
-				ctx.Conn = conn
-				ctx.MessageId = msgId.MsgId()
-				ctx.MessageType = msgId.Type()
-				ctx.MessageGroup = msgId.Group()
-				ctx.MessageExtra = msgId.Extra()
-				ctx.MessageBody = &MessageBodyWrapper{RawContent: body, Codec: c}
-				ctx.Codec = c
-				a.defaultRouter.OnHandleRequest(ctx)
-			})
-			services[s.Name] = serv
-		case "kcp":
 
-		case "http":
+		var n net.Protocol
+		if strings.ToLower(s.Net) == "tcp" {
+			n = net.Tcp
+		} else if strings.ToLower(s.Net) == "ws" {
+			n = net.WebSocket
+		} else if strings.ToLower(s.Net) == "kcp" {
+			n = net.Kcp
+		} else if strings.ToLower(s.Net) == "http" {
 			go func() {
-				fwlogger.D("-- http service start on %s --", strconv.Itoa(s.Port))
+				log.D("http service start on %s", strconv.Itoa(s.Port))
 				if err := fasthttp.ListenAndServe(":"+strconv.Itoa(s.Port), func(req *fasthttp.RequestCtx) {
-					fwlogger.D("====> %s %s", string(req.Path()), string(req.Request.Body()))
+					log.D("====> %s %s", string(req.Path()), string(req.Request.Body()))
 					ctx := a.WebApiCtxPool().Acquire().(*WebApiContext)
 					defer a.WebApiCtxPool().Release(ctx)
 					ctx.RequestCtx = req
 					ctx.Codec = c
 					a.defaultRouter.OnHandleRequest(ctx)
 				}); err != nil {
-					fwlogger.E("-- startup http service failed! %s --", err.Error())
+					log.E("-- startup http service failed! %s --", err.Error())
 				}
 			}()
+			return
+		} else {
+			log.E("Wrong net protocol, must be one of http, tcp, kcp, ws.")
+			return
 		}
+		serv, err := net.GoListen(n, s.Port, func(conn net.Conn, msgId net.MessageId, body net.MessageBody) {
+			ctx := a.ServiceCtxPool().Acquire().(*ServiceContext)
+			defer a.ServiceCtxPool().Release(ctx)
+			ctx.Conn = conn
+			ctx.MessageId = msgId.MsgId()
+			ctx.MessageType = msgId.Type()
+			ctx.MessageGroup = msgId.Group()
+			ctx.MessageExtra = msgId.Extra()
+			ctx.MessageBody = &MessageBodyWrapper{RawContent: body, Codec: c}
+			ctx.Codec = c
+			a.defaultRouter.OnHandleRequest(ctx)
+		})
+		if err != nil {
+			log.E("Startup %s server failed, %s, %s", s.Net, k, err.Error())
+			return
+		}
+		services[k] = serv
 	}
 	a.AddModule(module.NewServiceModule(services))
 
@@ -294,8 +289,8 @@ func (a *application) Name() string {
 	return a.name
 }
 
-func (a *application) RegisterMVCObjects(objs ...interface{}) {
-	a.mvcObjs = append(a.mvcObjs, objs)
+func (a *application) RegisterController(objs ...interface{}) {
+	a.controllers = append(a.controllers, objs)
 }
 
 func (a *application) AddModule(module module.Module) {

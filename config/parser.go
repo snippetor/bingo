@@ -47,6 +47,7 @@ type AppConfig struct {
 
 type GlobalConfig struct {
 	EnableBingoLog bool
+	BingoLogLevel  log.Level
 }
 
 type BingoConfig struct {

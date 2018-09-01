@@ -1,13 +1,15 @@
 package main
 
-import "fmt"
-
-var (
+import (
+	"fmt"
+	"os"
+	"github.com/snippetor/bingo/net"
 )
 
+var ()
+
 func main() {
-	m := make(map[int]int)
-	m[1]=1
-	m[2]=1
-	fmt.Println(len(m))
+	fmt.Println(os.Args)
+
+	net.Listen(net.Kcp, 8080, nil)
 }

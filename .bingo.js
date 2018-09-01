@@ -37,6 +37,7 @@ Mongo = "mongo";
  */
 config = {
     enableBingoLog: true,
+    bingoLogLevel: LevelInfo,
 };
 /**
  * apps中定义所有节点配置。
@@ -100,3 +101,25 @@ config = {
  *  @config: 自定义配置
  */
 apps = {};
+
+apps.test1 = {
+    package: "test",
+    etcds: [],
+    service: {},
+    rpcPort: 0,
+    rpcTo: [],
+    logs: {default: {}},
+    db: {},
+    config: {}
+};
+
+apps.test2 = {
+	package: "test",
+    etcds: [],
+    service: {},
+    rpcPort: 0,
+    rpcTo: [],  
+    logs: {default: {}},
+    db: {},
+    config: {}
+};

@@ -158,9 +158,10 @@ func (a *application) Run() {
 	}
 	a.AddModule(module.NewLogModule(loggers))
 	// default logger
-	if defLogger, ok := loggers["default"]; ok {
+	if defLogger, ok := loggers["default"]; ok && a.bingoConfig.Config.EnableBingoLog {
 		log.DefaultLogger = defLogger
 	}
+	log.DefaultLogger.SetLevel(a.bingoConfig.Config.BingoLogLevel)
 	// config
 	a.config = utils.NewValueMap()
 	for k, v := range appConfig.Config {

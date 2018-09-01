@@ -52,6 +52,7 @@ func (p *JsParser) Parse(configPath string) *BingoConfig {
 func (p *JsParser) parseGlobalConfig(v *otto.Object) *GlobalConfig {
 	return &GlobalConfig{
 		EnableBingoLog: p.parseBoolMust("enableBingoLog", v, false),
+		BingoLogLevel:  log.Level(p.parseIntMust("bingoLogLevel", v, 0)),
 	}
 }
 

@@ -9,12 +9,13 @@ import (
 	"strings"
 	"regexp"
 	"os/exec"
+	"bytes"
+	"runtime"
 )
 
 var (
 	cmd                 *exec.Cmd
 	eventTime           = make(map[string]int64)
-	scheduleTime        time.Time
 	watchExts           = []string{".go"}
 	ignoredFilesRegExps = []string{
 		`.#(\w+).go`,
@@ -59,7 +60,31 @@ func kill() {
 	}
 }
 
-func watch(appPackage, appName, env string) {
+func build(appPackage, appName string) {
+	printInfo("Start building ...")
+	cmdName := "go"
+	var (
+		err    error
+		stderr bytes.Buffer
+	)
+	if runtime.GOOS == "windows" {
+		appName += ".exe"
+	}
+	args := []string{"build"}
+	args = append(args, "-o", appName)
+	cmd := exec.Command(cmdName, args...)
+	cmd.Dir = appPackage
+	cmd.Env = append(os.Environ(), "GOGC=off")
+	cmd.Stderr = &stderr
+	err = cmd.Run()
+	if err != nil {
+		printError("Failed to build the application: %s", stderr.String())
+		return
+	}
+	printInfo("Built Successfully.")
+}
+
+func Watch(appPackage, appName, env string) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		printError(err.Error())
@@ -87,7 +112,7 @@ func watch(appPackage, appName, env string) {
 					go func() {
 						// Wait 1s before autobuild until there is no file change.
 						time.Sleep(1 * time.Second)
-						Build(appPackage, appName)
+						build(appPackage, appName)
 						kill()
 						start(appPackage, appName, env)
 					}()
@@ -106,7 +131,7 @@ func watch(appPackage, appName, env string) {
 			printError(err.Error())
 		}
 	}
-	Build(appPackage, appName)
+	build(appPackage, appName)
 	kill()
 	start(appPackage, appName, env)
 	var done chan bool

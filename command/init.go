@@ -44,6 +44,7 @@ Mongo = "mongo";
  */
 config = {
     enableBingoLog: true,
+	bingoLogLevel: LevelInfo,
 };
 /**
  * apps中定义所有节点配置。

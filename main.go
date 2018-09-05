@@ -118,6 +118,29 @@ func main() {
 				return nil
 			},
 		},
+		{
+			Name:      "pb",
+			Usage:     "gen protobuf go file using gogofaster(https://github.com/gogo/protobuf)",
+			UsageText: "bingo pb [.proto dir]",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "d",
+					Usage: "output directory",
+				},
+				cli.BoolFlag{
+					Name:  "s",
+					Usage: "output file into single directory",
+				},
+			},
+			Action: func(c *cli.Context) error {
+				if c.NArg() == 1 {
+					command.Pb(c.Args()[0], c.String("d"), c.Bool("s"))
+				} else {
+					cli.ShowCommandHelp(c, "pb")
+				}
+				return nil
+			},
+		},
 	}
 
 	sort.Sort(cli.CommandsByName(app.Commands))

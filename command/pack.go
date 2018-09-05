@@ -11,8 +11,8 @@ import (
 	"fmt"
 )
 
-func Publish(appName, env string) {
-	printInfo("Start publishing ...")
+func Pack(appName, env string) {
+	printInfo("Start packing ...")
 	Build(appName, env)
 
 	bingoConfig, name := getBingoConfig(env)

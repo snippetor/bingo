@@ -198,7 +198,7 @@ func (a *application) Run() {
 	var rpcServer *rpc.Server
 	if appConfig.RpcPort > 0 {
 		rpcServer = &rpc.Server{}
-		rpcServer.Listen(appConfig.Name, appConfig.Package, appConfig.RpcPort, appConfig.Etds, func(server *rpc.Server) {
+		rpcServer.Listen(appConfig.Name, appConfig.Package, appConfig.RpcPort, func(server *rpc.Server) {
 			for key := range a.defaultRouter.Handlers("RPC") {
 				server.RegisterFunction(key, func(c context2.Context, args []byte, reply *[]byte) error {
 					ctx := a.RpcCtxPool().Acquire().(*RpcContext)
@@ -214,7 +214,12 @@ func (a *application) Run() {
 	var rpcClients []*rpc.Client
 	for _, serverPkg := range appConfig.RpcTo {
 		c := &rpc.Client{}
-		c.Connect(appConfig.Name, appConfig.Package, serverPkg, appConfig.Etds)
+		servConfigs := a.bingoConfig.FindAppsByPackage(serverPkg)
+		var address []string
+		for i := range servConfigs {
+			address = append(address, fmt.Sprintf("%s:%d", servConfigs[i].Domain, servConfigs[i].RpcPort))
+		}
+		c.Connect(appConfig.Name, appConfig.Package, serverPkg, address)
 		rpcClients = append(rpcClients, c)
 	}
 	a.AddModule(module.NewRPCModule(appConfig.Name, rpcClients, rpcServer))

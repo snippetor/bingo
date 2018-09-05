@@ -60,8 +60,8 @@ func (p *JsParser) parseApp(name string, v *otto.Object) *AppConfig {
 	app := &AppConfig{Name: name}
 	// Package
 	app.Package = p.parseString("package", v)
-	// etds
-	app.Etds = p.parseStrings("etcds", v)
+	// domain
+	app.Domain = p.parseString("domain", v)
 	// Service map[string]*Service
 	service := p.parseObjects("service", v)
 	app.Service = make(map[string]*Service)

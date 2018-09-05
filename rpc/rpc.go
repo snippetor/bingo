@@ -15,12 +15,9 @@
 package rpc
 
 import (
-	"time"
 	"github.com/smallnest/rpcx/server"
 	"strconv"
 	"github.com/smallnest/rpcx/client"
-	"github.com/rcrowley/go-metrics"
-	"github.com/smallnest/rpcx/serverplugin"
 	"context"
 	"github.com/smallnest/rpcx/protocol"
 	"github.com/gogo/protobuf/proto"
@@ -35,23 +32,11 @@ type Server struct {
 	serv    *server.Server
 }
 
-func (s *Server) Listen(appName, pkg string, port int, etcdAddrs []string, onInit func(server *Server)) {
+func (s *Server) Listen(appName, pkg string, port int, onInit func(server *Server)) {
 	s.appName = appName
 	s.pkg = pkg
 	s.serv = server.NewServer()
 	go func() {
-		r := &serverplugin.EtcdRegisterPlugin{
-			ServiceAddress: "kcp@:" + strconv.Itoa(port),
-			EtcdServers:    etcdAddrs,
-			BasePath:       "bingo",
-			Metrics:        metrics.NewRegistry(),
-			UpdateInterval: time.Minute,
-		}
-		err := r.Start()
-		if err != nil {
-			panic(err)
-		}
-		s.serv.Plugins.Add(r)
 		if onInit != nil {
 			onInit(s)
 		}
@@ -72,18 +57,22 @@ func (s *Server) Close() {
 }
 
 type Client struct {
-	appName       string
-	pkg           string
-	addr          string
-	ServerAppName string
-	client        client.XClient
+	appName   string
+	pkg       string
+	addr      string
+	ServerPkg string
+	client    client.XClient
 }
 
-func (c *Client) Connect(appName, pkg, serverPkg string, etcdAddrs []string) {
+func (c *Client) Connect(appName, pkg, serverPkg string, address []string) {
 	c.appName = appName
 	c.pkg = pkg
-	c.ServerAppName = serverPkg
-	d := client.NewEtcdDiscovery("bingo", serverPkg, etcdAddrs, nil)
+	c.ServerPkg = serverPkg
+	var pairs []*client.KVPair
+	for i := range address {
+		pairs = append(pairs, &client.KVPair{Key: address[i]})
+	}
+	d := client.NewMultipleServersDiscovery(pairs)
 	var option = client.DefaultOption
 	option.SerializeType = protocol.SerializeNone
 	c.client = client.NewXClient(serverPkg, client.Failtry, client.RoundRobin, d, option)

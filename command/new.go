@@ -10,11 +10,18 @@ import (
 var appTemplate = `
 apps.%s = {
 	package: "%s",
-    etcds: [],
+	domain: "127.0.0.1",
     service: {},
     rpcPort: 0,
     rpcTo: [],  
-    logs: {default: {}},
+    logs: {
+		default: {
+            level: LevelInfo,
+            outputType: OutputConsole | OutputFile,
+            outputDir: ".",
+            rollingType: RollingDaily
+		}
+	},
     db: {},
     config: {}
 };

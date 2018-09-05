@@ -44,7 +44,7 @@ config = {
  * 单个节点配置如下：
  * apps.app1 = {
  *   package: "app",
- *   etcds: [],
+ *   domain: "127.0.0.1",
  *   service: {
  *      http8080: { net: "http", port: 8080, codec: "json" },
  *      kcp9090: { net: "kcp", port: 9090 },
@@ -52,7 +52,7 @@ config = {
  *      ws9092: { net: "ws", port: 9092 },
  *   },
  *   rpcPort: 0,           
- *   rpcTo: ["app2"],      
+ *   rpcTo: ["app"],
  *   logs: {
  *       default: {
  *           level: LevelInfo,
@@ -83,12 +83,12 @@ config = {
  *  }
  *  @app1: 为app唯一名称，可自定义，并在运行时作为进程名，日志名称也使用它
  *  @package：节点代码实现所在的工程目录
- *  @etcds: 设置需要注册的etcd服务器地址
+ *  @domain：节点服务器ip地址
  *  @service: 定义节点需要启用的服务，
  *      @net: 可以为http, kcp, tcp, ws
  *      @codec: 默认为protobuf, 可以为json, protobuf
  *  @rpcPort: 如果需要启用RPC Server则设置此端口；反之则设置为0或不设置
- *  @rpcTo: 如果需要RPC链接到那个app则添加到rpcTo；反之则设置为空或不设置
+ *  @rpcTo: 如果需要RPC链接到那个app(package而不是appname)则添加到rpcTo；反之则设置为空或不设置
  *  @log: 日志配置，必须设置default日志，如果不设置日志将只输出到控制台
  *      @level: 日志打印的最小级别
  *      @outputType: 输出类型
@@ -104,22 +104,18 @@ apps = {};
 
 apps.test1 = {
     package: "test",
-    etcds: [],
+    domain: "127.0.0.1",
     service: {},
     rpcPort: 0,
     rpcTo: [],
-    logs: {default: {}},
-    db: {},
-    config: {}
-};
-
-apps.test2 = {
-	package: "test",
-    etcds: [],
-    service: {},
-    rpcPort: 0,
-    rpcTo: [],  
-    logs: {default: {}},
+    logs: {
+        default: {
+            level: LevelInfo,
+            outputType: OutputConsole | OutputFile,
+            outputDir: ".",
+            rollingType: RollingDaily
+        }
+    },
     db: {},
     config: {}
 };

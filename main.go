@@ -79,19 +79,19 @@ func main() {
 			},
 		},
 		{
-			Name:      "publish",
+			Name:      "pack",
 			Aliases:   []string{"b"},
-			Usage:     "publish bingo app, if app name is * or app name and env is empty, publish all app in one package.",
+			Usage:     "pack bingo app, if app name is * or app name and env is empty, pack all app in one package.",
 			UsageText: "bingo publish [app name] [env]",
 			Action: func(c *cli.Context) error {
 				if c.NArg() == 0 {
-					command.Publish("*", "")
+					command.Pack("*", "")
 				} else if c.NArg() == 1 {
-					command.Publish(c.Args()[0], "")
+					command.Pack(c.Args()[0], "")
 				} else if c.NArg() == 2 {
-					command.Publish(c.Args()[0], c.Args()[1])
+					command.Pack(c.Args()[0], c.Args()[1])
 				} else {
-					cli.ShowCommandHelp(c, "publish")
+					cli.ShowCommandHelp(c, "pack")
 				}
 				return nil
 			},

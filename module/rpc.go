@@ -23,7 +23,7 @@ func NewRPCModule(appName string, rpcClients []*rpc.Client, rpcServer *rpc.Serve
 func (m *rpcModule) Call(appName, method string, args interface{}, reply interface{}) error {
 	if m.rpcClients != nil && len(m.rpcClients) > 0 {
 		for _, c := range m.rpcClients {
-			if c.ServerAppName == appName {
+			if c.ServerPkg == appName {
 				return c.Call(method, args, reply)
 			}
 		}

@@ -35,8 +35,8 @@ type DBConfig struct {
 
 type AppConfig struct {
 	Name    string
+	Domain  string
 	Package string
-	Etds    []string
 	Service map[string]*Service
 	RpcPort int
 	RpcTo   []string
@@ -66,4 +66,14 @@ func (c *BingoConfig) FindApp(name string) *AppConfig {
 		}
 	}
 	return nil
+}
+
+func (c *BingoConfig) FindAppsByPackage(pkg string) []*AppConfig {
+	var configs []*AppConfig
+	for _, c := range c.Apps {
+		if c.Package == pkg {
+			configs = append(configs, c)
+		}
+	}
+	return configs
 }

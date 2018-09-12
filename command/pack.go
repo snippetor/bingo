@@ -11,9 +11,9 @@ import (
 	"fmt"
 )
 
-func Pack(appName, env string) {
+func Pack(appName, env, platform string) {
 	printInfo("Start packing ...")
-	Build(appName, env)
+	Build(appName, env, platform)
 
 	bingoConfig, name := getBingoConfig(env)
 

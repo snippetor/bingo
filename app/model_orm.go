@@ -1,4 +1,4 @@
-package mvc
+package app
 
 import (
 	"github.com/jinzhu/gorm"

@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"bytes"
 	"runtime"
+	"github.com/snippetor/bingo/errors"
 )
 
 var (
@@ -32,11 +33,13 @@ func start(appPackage, appName, env string) {
 	if !strings.Contains(appName, "./") {
 		appName = "./" + appName
 	}
+	wd, err := os.Getwd()
+	errors.Check(err)
 	var args []string
 	if env == "" {
-		args = []string{"-n", app}
+		args = []string{"-n", app, "-c", filepath.Join(wd, ".bingo.js")}
 	} else {
-		args = []string{"-e", env, "-n", app}
+		args = []string{"-e", env, "-n", app, "-c", filepath.Join(wd, ".bingo."+env+".js")}
 	}
 	cmd = exec.Command(appName, args...)
 	cmd.Dir = appPackage
@@ -60,7 +63,7 @@ func kill() {
 	}
 }
 
-func build(appPackage, appName string) {
+func build(appPackage, appName string) bool {
 	printInfo("Start building ...")
 	cmdName := "go"
 	var (
@@ -72,16 +75,18 @@ func build(appPackage, appName string) {
 	}
 	args := []string{"build"}
 	args = append(args, "-o", appName)
+	args = append(args, "-tags", "kcp")
 	cmd := exec.Command(cmdName, args...)
 	cmd.Dir = appPackage
 	cmd.Env = append(os.Environ(), "GOGC=off")
 	cmd.Stderr = &stderr
 	err = cmd.Run()
 	if err != nil {
-		printError("Failed to build the application: %s", stderr.String())
-		return
+		printError("Failed to build the application: \n%s", stderr.String())
+		return false
 	}
 	printInfo("Built Successfully.")
+	return true
 }
 
 func Watch(appPackage, appName, env string) {
@@ -90,6 +95,7 @@ func Watch(appPackage, appName, env string) {
 		printError(err.Error())
 	}
 	defer watcher.Close()
+	var done chan bool
 
 	go func() {
 		for {
@@ -112,9 +118,12 @@ func Watch(appPackage, appName, env string) {
 					go func() {
 						// Wait 1s before autobuild until there is no file change.
 						time.Sleep(1 * time.Second)
-						build(appPackage, appName)
-						kill()
-						start(appPackage, appName, env)
+						if build(appPackage, appName) {
+							kill()
+							start(appPackage, appName, env)
+						} else {
+							done <- true
+						}
 					}()
 				}
 			case err := <-watcher.Errors:
@@ -131,11 +140,11 @@ func Watch(appPackage, appName, env string) {
 			printError(err.Error())
 		}
 	}
-	build(appPackage, appName)
-	kill()
-	start(appPackage, appName, env)
-	var done chan bool
-	<-done
+	if build(appPackage, appName) {
+		kill()
+		start(appPackage, appName, env)
+		<-done
+	}
 }
 
 func getAllPath(currPath string, paths *[]string) {

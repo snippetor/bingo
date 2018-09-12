@@ -64,14 +64,20 @@ func main() {
 			Name:      "build",
 			Aliases:   []string{"b"},
 			Usage:     "build bingo app, if app name is * or app name and env is empty, build all app.",
-			UsageText: "bingo build [app name] [env]",
+			UsageText: "bingo build [app name] [env] [options]",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "p",
+					Usage: "build platform",
+				},
+			},
 			Action: func(c *cli.Context) error {
 				if c.NArg() == 0 {
-					command.Build("*", "")
+					command.Build("*", "", c.String("p"))
 				} else if c.NArg() == 1 {
-					command.Build(c.Args()[0], "")
+					command.Build(c.Args()[0], "", c.String("p"))
 				} else if c.NArg() == 2 {
-					command.Build(c.Args()[0], c.Args()[1])
+					command.Build(c.Args()[0], c.Args()[1], c.String("p"))
 				} else {
 					cli.ShowCommandHelp(c, "build")
 				}
@@ -83,13 +89,19 @@ func main() {
 			Aliases:   []string{"b"},
 			Usage:     "pack bingo app, if app name is * or app name and env is empty, pack all app in one package.",
 			UsageText: "bingo publish [app name] [env]",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "p",
+					Usage: "build platform",
+				},
+			},
 			Action: func(c *cli.Context) error {
 				if c.NArg() == 0 {
-					command.Pack("*", "")
+					command.Pack("*", "", c.String("p"))
 				} else if c.NArg() == 1 {
-					command.Pack(c.Args()[0], "")
+					command.Pack(c.Args()[0], "", c.String("p"))
 				} else if c.NArg() == 2 {
-					command.Pack(c.Args()[0], c.Args()[1])
+					command.Pack(c.Args()[0], c.Args()[1], c.String("p"))
 				} else {
 					cli.ShowCommandHelp(c, "pack")
 				}

@@ -22,9 +22,6 @@ import (
 	"strings"
 	"strconv"
 	"github.com/valyala/fasthttp"
-	"github.com/snippetor/bingo/middleware/latency"
-	"github.com/snippetor/bingo/middleware/recover"
-	"github.com/snippetor/bingo/mvc"
 	"github.com/snippetor/bingo/rpc"
 	"github.com/snippetor/bingo/net"
 	"github.com/snippetor/bingo/codec"
@@ -85,13 +82,15 @@ type application struct {
 	globalMiddleWares Handlers
 	endRunning        chan bool
 
-	bingoConfig *config.BingoConfig
-	env         string
+	bingoConfig    *config.BingoConfig
+	env            string
+	configFilePath string
 }
 
 var (
 	n = flag.String("n", "", "app name")
 	e = flag.String("e", "", "env")
+	c = flag.String("c", "", "config file")
 )
 
 func New() Application {
@@ -111,12 +110,24 @@ func New() Application {
 		env = *e
 	}
 
+	var conf string
+	if c == nil {
+		if env == "" {
+			conf = ".bingo.js"
+		} else {
+			conf = ".bingo." + env + ".js"
+		}
+	} else {
+		conf = *c
+	}
+
 	a := &application{
-		name:          appName,
-		modules:       make(map[string]module.Module),
-		defaultRouter: NewRouter(),
-		endRunning:    make(chan bool, 1),
-		env:           env,
+		name:           appName,
+		modules:        make(map[string]module.Module),
+		defaultRouter:  NewRouter(),
+		endRunning:     make(chan bool, 1),
+		env:            env,
+		configFilePath: conf,
 	}
 	a.rpcCtxPool = NewPool(func() Context {
 		return &RpcContext{
@@ -137,15 +148,9 @@ func New() Application {
 }
 
 func (a *application) Run() {
-	var fileName string
-	if a.env == "" {
-		fileName = ".bingo.js"
-	} else {
-		fileName = ".bingo." + a.env + ".js"
-	}
 	// 解析配置文件
 	p := config.JsParser{}
-	a.bingoConfig = p.Parse(fileName)
+	a.bingoConfig = p.Parse(a.configFilePath)
 	// 找到app配置
 	appConfig := a.bingoConfig.FindApp(a.name)
 	if appConfig == nil {
@@ -167,8 +172,6 @@ func (a *application) Run() {
 	for k, v := range appConfig.Config {
 		a.config.Put(k, v)
 	}
-	// middleware
-	a.Use(recover.New(), latency.New())
 	// db
 	mongoes := make(map[string]module.MongoDB)
 	mysqls := make(map[string]module.MySqlDB)
@@ -188,9 +191,9 @@ func (a *application) Run() {
 	}
 	// init mvc objects
 	for _, obj := range a.controllers {
-		if mvc.IsController(obj) {
+		if IsController(obj) {
 			builder := newRouterBuild(a.defaultRouter, obj)
-			obj.(mvc.Controller).Route(builder)
+			obj.(Controller).Route(builder)
 			builder.Build()
 		}
 	}

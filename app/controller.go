@@ -1,7 +1,6 @@
-package mvc
+package app
 
 import (
-	"github.com/snippetor/bingo/app"
 	"reflect"
 )
 
@@ -12,5 +11,5 @@ func IsController(i interface{}) bool {
 }
 
 type Controller interface {
-	Route(builder app.RouterBuilder)
+	Route(builder RouterBuilder)
 }
